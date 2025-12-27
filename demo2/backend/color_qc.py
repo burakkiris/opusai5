@@ -286,12 +286,233 @@ def detect_surface_defects(image):
                 "type": defect_type,
                 "name": DEFECT_TYPES[defect_type]["name"],
                 "severity": DEFECT_TYPES[defect_type]["severity"],
-                "location": {"x": x, "y": y, "w": w, "h": h},
-                "area": area,
+                "location": {"x": int(x), "y": int(y), "w": int(w), "h": int(h)},
+                "area": float(area),
                 "confidence": round(70 + np.random.random() * 25, 1)
             })
     
     return defects[:5]  # En fazla 5 kusur
+
+def generate_color_heatmap(image, color_code):
+    """Renk sapma haritası oluştur - Delta E değerlerini görselleştir"""
+    if image is None:
+        return None
+    
+    ref_lab = AYGUN_COLOR_STANDARDS[color_code]["lab_reference"]
+    h, w = image.shape[:2]
+    
+    # Her piksel için Delta E hesapla
+    heatmap = np.zeros((h, w), dtype=np.float32)
+    
+    # Performans için görüntüyü küçült
+    scale = 4
+    small = cv2.resize(image, (w // scale, h // scale))
+    small_h, small_w = small.shape[:2]
+    
+    for y in range(small_h):
+        for x in range(small_w):
+            pixel_bgr = small[y, x]
+            pixel_rgb = [int(pixel_bgr[2]), int(pixel_bgr[1]), int(pixel_bgr[0])]
+            pixel_lab = rgb_to_lab(pixel_rgb)
+            delta_e = calculate_delta_e_2000(pixel_lab, ref_lab)
+            heatmap[y * scale:(y + 1) * scale, x * scale:(x + 1) * scale] = delta_e
+    
+    # Normalize ve renklendirme
+    heatmap = np.clip(heatmap, 0, 10)  # Max 10 Delta E
+    heatmap_normalized = (heatmap / 10 * 255).astype(np.uint8)
+    heatmap_colored = cv2.applyColorMap(heatmap_normalized, cv2.COLORMAP_JET)
+    
+    # Orijinal görüntü ile blend
+    alpha = 0.6
+    blended = cv2.addWeighted(image, 1 - alpha, heatmap_colored, alpha, 0)
+    
+    # Renk skalası ekle
+    scale_width = 30
+    scale_height = h - 100
+    scale_x = w - 60
+    scale_y = 50
+    
+    # Gradient bar
+    for i in range(scale_height):
+        color_val = int(255 * (1 - i / scale_height))
+        color = cv2.applyColorMap(np.array([[color_val]], dtype=np.uint8), cv2.COLORMAP_JET)[0][0]
+        cv2.rectangle(blended, (scale_x, scale_y + i), (scale_x + scale_width, scale_y + i + 1), 
+                     color.tolist(), -1)
+    
+    # Skala etiketleri
+    cv2.rectangle(blended, (scale_x - 5, scale_y - 25), (scale_x + scale_width + 40, scale_y + scale_height + 25), 
+                 (255, 255, 255), -1)
+    cv2.putText(blended, "Delta E", (scale_x - 5, scale_y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+    cv2.putText(blended, "0", (scale_x + scale_width + 5, scale_y + scale_height), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+    cv2.putText(blended, "5", (scale_x + scale_width + 5, scale_y + scale_height // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+    cv2.putText(blended, "10", (scale_x + scale_width + 5, scale_y + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+    
+    return blended
+
+def generate_gloss_map(image):
+    """Parlaklık haritası oluştur"""
+    if image is None:
+        return None
+    
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    h, w = gray.shape
+    
+    # Yerel parlaklık hesaplama (blok bazlı)
+    block_size = 32
+    gloss_map = np.zeros_like(gray, dtype=np.float32)
+    
+    for y in range(0, h - block_size, block_size // 2):
+        for x in range(0, w - block_size, block_size // 2):
+            block = gray[y:y + block_size, x:x + block_size]
+            # Yüksek değerli piksellerin oranı
+            high_vals = np.sum(block > 200) / (block_size * block_size)
+            std = np.std(block)
+            gloss = min(100, (high_vals * 100 + std / 2.55) / 2)
+            gloss_map[y:y + block_size, x:x + block_size] = gloss
+    
+    # Normalize ve renklendirme
+    gloss_normalized = (gloss_map / 100 * 255).astype(np.uint8)
+    gloss_colored = cv2.applyColorMap(gloss_normalized, cv2.COLORMAP_PLASMA)
+    
+    # Orijinal ile blend
+    alpha = 0.5
+    blended = cv2.addWeighted(image, 1 - alpha, gloss_colored, alpha, 0)
+    
+    return blended
+
+def generate_defect_heatmap(image, defects):
+    """Kusur yoğunluk haritası oluştur"""
+    if image is None:
+        return None
+    
+    h, w = image.shape[:2]
+    heatmap = np.zeros((h, w), dtype=np.float32)
+    
+    # Her kusur için Gaussian blob ekle
+    for defect in defects:
+        loc = defect["location"]
+        cx, cy = loc["x"] + loc["w"] // 2, loc["y"] + loc["h"] // 2
+        radius = max(loc["w"], loc["h"]) * 2
+        
+        # Gaussian blob
+        for y in range(max(0, cy - radius), min(h, cy + radius)):
+            for x in range(max(0, cx - radius), min(w, cx + radius)):
+                dist = np.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+                if dist < radius:
+                    intensity = np.exp(-dist ** 2 / (2 * (radius / 2) ** 2))
+                    severity_mult = 3 if defect["severity"] == "critical" else 2 if defect["severity"] == "major" else 1
+                    heatmap[y, x] += intensity * severity_mult
+    
+    # Normalize
+    if heatmap.max() > 0:
+        heatmap = (heatmap / heatmap.max() * 255).astype(np.uint8)
+    else:
+        heatmap = heatmap.astype(np.uint8)
+    
+    heatmap_colored = cv2.applyColorMap(heatmap, cv2.COLORMAP_HOT)
+    
+    # Orijinal ile blend
+    alpha = 0.5
+    blended = cv2.addWeighted(image, 1 - alpha, heatmap_colored, alpha, 0)
+    
+    return blended
+
+def create_simulated_image(product_code, color_code):
+    """Kamera yoksa simülasyon görüntüsü oluştur"""
+    # 1280x720 boş görüntü
+    img = np.ones((720, 1280, 3), dtype=np.uint8) * 200
+    
+    # Ürün rengine göre merkez bölgeyi boya
+    color_rgb = AYGUN_COLOR_STANDARDS[color_code]["rgb_reference"]
+    # Hafif varyasyon ekle
+    color_bgr = [
+        int(color_rgb[2] + np.random.randint(-20, 20)),
+        int(color_rgb[1] + np.random.randint(-20, 20)),
+        int(color_rgb[0] + np.random.randint(-20, 20))
+    ]
+    
+    # Merkez bölge (ürün yüzeyi)
+    cv2.rectangle(img, (200, 150), (1080, 570), color_bgr, -1)
+    
+    # Rastgele kusurlar ekle (simülasyon için)
+    num_defects = np.random.randint(0, 4)
+    for _ in range(num_defects):
+        x = np.random.randint(250, 1000)
+        y = np.random.randint(200, 500)
+        w = np.random.randint(20, 80)
+        h = np.random.randint(20, 80)
+        # Kusur rengi (daha koyu)
+        defect_color = [max(0, c - 50) for c in color_bgr]
+        cv2.rectangle(img, (x, y), (x + w, y + h), defect_color, -1)
+    
+    # Gürültü ekle
+    noise = np.random.randint(-15, 15, img.shape, dtype=np.int16)
+    img = np.clip(img.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+    
+    return img
+
+def draw_defects_on_image(image, defects, color_status, product_name):
+    """Kusurları görüntü üzerine çiz - Aygün Cerrahi Aletler formatı"""
+    if image is None:
+        return None
+    
+    annotated = image.copy()
+    h, w = annotated.shape[:2]
+    
+    # Aygün logosu için üst banner
+    cv2.rectangle(annotated, (0, 0), (w, 60), (30, 58, 95), -1)
+    cv2.putText(annotated, "AYGUN CERRAHI ALETLER", (10, 25), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+    cv2.putText(annotated, product_name, (10, 50), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+    
+    # Renk durumu badge
+    status_color = (0, 255, 0) if color_status == "GECTI" else (0, 165, 255) if color_status == "UYARI" else (0, 0, 255)
+    status_text = "RENK: " + color_status
+    cv2.rectangle(annotated, (w-200, 10), (w-10, 50), status_color, -1)
+    cv2.putText(annotated, status_text, (w-190, 35), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+    
+    # Kusurları işaretle
+    for i, defect in enumerate(defects):
+        loc = defect["location"]
+        x, y, dw, dh = loc["x"], loc["y"], loc["w"], loc["h"]
+        
+        # Severity'ye göre renk
+        if defect["severity"] == "critical":
+            color = (0, 0, 255)  # Kırmızı
+        elif defect["severity"] == "major":
+            color = (0, 165, 255)  # Turuncu
+        else:
+            color = (0, 255, 255)  # Sarı
+        
+        # Bounding box
+        cv2.rectangle(annotated, (x, y), (x + dw, y + dh), color, 3)
+        
+        # Kusur etiketi
+        label = f"{i+1}. {defect['name']}"
+        label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+        
+        # Etiket arka planı
+        cv2.rectangle(annotated, (x, y - label_size[1] - 10), 
+                     (x + label_size[0] + 10, y), color, -1)
+        cv2.putText(annotated, label, (x + 5, y - 5), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        
+        # Güven skoru
+        conf_text = f"%{defect['confidence']:.0f}"
+        cv2.putText(annotated, conf_text, (x + dw - 50, y + dh - 5), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+    
+    # Alt bilgi çubuğu
+    cv2.rectangle(annotated, (0, h-40), (w, h), (30, 58, 95), -1)
+    timestamp = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+    cv2.putText(annotated, f"Analiz Zamani: {timestamp}", (10, h-15), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    cv2.putText(annotated, f"Kusur Sayisi: {len(defects)}", (w-200, h-15), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    
+    return annotated
 
 def analyze_color_region(image, color_code):
     """Görüntüdeki ana renk bölgesini analiz et"""
@@ -346,15 +567,38 @@ def get_frame():
         return frame if ret else None
 
 def generate_video_stream():
-    """Video stream generator"""
+    """Video stream generator - kamera yoksa simülasyon"""
     global is_analyzing
+    last_sim_time = 0
+    sim_frame = None
     
-    if not init_camera():
-        return
+    # Kamerayı dene
+    camera_available = init_camera()
     
     while True:
         frame = get_frame()
+        
+        # Kamera yoksa simülasyon görüntüsü göster
         if frame is None:
+            current_time = time.time()
+            # Her 2 saniyede bir yeni simülasyon görüntüsü
+            if sim_frame is None or (current_time - last_sim_time) > 2:
+                # Rastgele ürün seç
+                product_code = np.random.choice(list(AYGUN_PRODUCTS.keys()))
+                color_code = AYGUN_PRODUCTS[product_code]["expected_color"]
+                sim_frame = create_simulated_image(product_code, color_code)
+                
+                # "SIMULASYON MODU" yazısı ekle
+                h, w = sim_frame.shape[:2]
+                cv2.rectangle(sim_frame, (0, 0), (w, 50), (50, 50, 50), -1)
+                cv2.putText(sim_frame, "SIMULASYON MODU - Kamera Bagli Degil", (20, 30),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+                last_sim_time = current_time
+            
+            frame = sim_frame
+        
+        if frame is None:
+            time.sleep(0.1)
             continue
         
         # Analiz modu aktifse overlay ekle
@@ -362,25 +606,15 @@ def generate_video_stream():
             # Merkez bölge göstergesi
             h, w = frame.shape[:2]
             cv2.rectangle(frame, (w//4, h//4), (3*w//4, 3*h//4), (0, 255, 255), 2)
-            cv2.putText(frame, "ANALIZ BOLGES", (w//4 + 10, h//4 - 10), 
+            cv2.putText(frame, "ANALIZ BOLGESI", (w//4 + 10, h//4 - 10), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-            
-            # Renk histogramı overlay
-            center = frame[h//4:3*h//4, w//4:3*w//4]
-            avg_b, avg_g, avg_r = np.mean(center, axis=(0, 1))
-            
-            # Renk göstergesi
-            cv2.rectangle(frame, (10, h-60), (60, h-10), (int(avg_b), int(avg_g), int(avg_r)), -1)
-            cv2.rectangle(frame, (10, h-60), (60, h-10), (255, 255, 255), 2)
-            cv2.putText(frame, f"R:{int(avg_r)} G:{int(avg_g)} B:{int(avg_b)}", 
-                       (70, h-30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-        else:
-            cv2.putText(frame, "ONIZLEME", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
         
-        # JPEG encode
-        _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+        # JPEG formatına çevir
+        ret, buffer = cv2.imencode('.jpg', frame)
+        frame_bytes = buffer.tobytes()
+        
         yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
         
         time.sleep(0.033)
 
@@ -441,7 +675,7 @@ async def stop_analysis():
 
 @app.post("/analyze")
 async def analyze_product(product_code: str = "AYG-STR-001"):
-    """Ürün analizi yap"""
+    """Ürün analizi yap - Fotoğraf çeker ve kusurları işaretler"""
     start_time = time.time()
     
     if product_code not in AYGUN_PRODUCTS:
@@ -453,6 +687,12 @@ async def analyze_product(product_code: str = "AYG-STR-001"):
     
     # Kameradan görüntü al (yoksa simülasyon)
     frame = get_frame()
+    
+    # Kamera yoksa simülasyon görüntüsü oluştur
+    if frame is None:
+        frame = create_simulated_image(product_code, color_code)
+    
+    original_frame = frame.copy() if frame is not None else None
     
     # Renk analizi
     measured_lab = analyze_color_region(frame, color_code)
@@ -512,6 +752,39 @@ async def analyze_product(product_code: str = "AYG-STR-001"):
     
     processing_time = (time.time() - start_time) * 1000
     
+    # Kusurları görüntü üzerine çiz
+    annotated_image = None
+    image_base64 = None
+    color_heatmap_base64 = None
+    gloss_map_base64 = None
+    defect_heatmap_base64 = None
+    
+    if original_frame is not None:
+        annotated_image = draw_defects_on_image(original_frame, defects, color_status, product["name"])
+        
+        # Base64'e çevir
+        if annotated_image is not None:
+            _, buffer = cv2.imencode('.jpg', annotated_image, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            image_base64 = base64.b64encode(buffer).decode('utf-8')
+        
+        # Renk haritası
+        color_heatmap = generate_color_heatmap(original_frame, color_code)
+        if color_heatmap is not None:
+            _, buffer = cv2.imencode('.jpg', color_heatmap, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            color_heatmap_base64 = base64.b64encode(buffer).decode('utf-8')
+        
+        # Parlaklık haritası
+        gloss_map = generate_gloss_map(original_frame)
+        if gloss_map is not None:
+            _, buffer = cv2.imencode('.jpg', gloss_map, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            gloss_map_base64 = base64.b64encode(buffer).decode('utf-8')
+        
+        # Kusur yoğunluk haritası
+        defect_heatmap = generate_defect_heatmap(original_frame, defects)
+        if defect_heatmap is not None:
+            _, buffer = cv2.imencode('.jpg', defect_heatmap, [cv2.IMWRITE_JPEG_QUALITY, 85])
+            defect_heatmap_base64 = base64.b64encode(buffer).decode('utf-8')
+    
     result = {
         "product_code": product_code,
         "product_name": product["name"],
@@ -531,11 +804,16 @@ async def analyze_product(product_code: str = "AYG-STR-001"):
         "overall_status": overall_status,
         "confidence": round(85 + np.random.random() * 14, 1),
         "processing_time_ms": round(processing_time, 1),
-        "recommendation": recommendation
+        "recommendation": recommendation,
+        "annotated_image": image_base64,
+        "color_heatmap": color_heatmap_base64,
+        "gloss_map": gloss_map_base64,
+        "defect_heatmap": defect_heatmap_base64
     }
     
-    # Geçmişe ekle
-    measurement_history.insert(0, result)
+    # Geçmişe ekle (görüntüler olmadan)
+    history_entry = {k: v for k, v in result.items() if k not in ["annotated_image", "color_heatmap", "gloss_map", "defect_heatmap"]}
+    measurement_history.insert(0, history_entry)
     if len(measurement_history) > 100:
         measurement_history.pop()
     
@@ -580,13 +858,27 @@ async def get_dashboard():
         if recent_avg > older_avg * 1.3:
             trend_warning = f"⚠️ Son kontrollerde ΔE artış trendi tespit edildi ({older_avg:.2f} → {recent_avg:.2f}). Eloksal banyosu parametrelerini kontrol ediniz."
     
+    # Kalite skoru hesapla
+    quality_rate = round((approved + review * 0.5) / total * 100, 1) if total > 0 else 100
+    
+    # Parlaklık istatistikleri
+    gloss_values = [m.get("gloss_value", 50) for m in measurement_history[:20]]
+    avg_gloss = round(np.mean(gloss_values), 1) if gloss_values else 50
+    
+    # Kusur istatistikleri
+    defect_counts = [m.get("defect_count", 0) for m in measurement_history[:20]]
+    avg_defects = round(np.mean(defect_counts), 2) if defect_counts else 0
+    
     return {
         "total_inspections": total,
         "approved": approved,
         "review": review,
         "rejected": rejected,
         "approval_rate": round(approved / total * 100, 1) if total > 0 else 0,
+        "quality_rate": quality_rate,
         "avg_delta_e": round(avg_delta_e, 2),
+        "avg_gloss": avg_gloss,
+        "avg_defects": avg_defects,
         "color_distribution": color_dist,
         "trend_warning": trend_warning,
         "recent_inspections": measurement_history[:20]

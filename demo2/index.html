@@ -190,6 +190,19 @@
                         <p class="text-sm">Henüz analiz yapılmadı</p>
                     </div>
                     
+                    <!-- Annotated Image -->
+                    <div id="annotatedImageContainer" class="hidden">
+                        <img id="annotatedImage" class="w-full" alt="Kusur Analizi">
+                        <div class="p-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+                            <button onclick="downloadImage()" class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                </svg>
+                                Fotoğrafı İndir
+                            </button>
+                        </div>
+                    </div>
+                    
                     <div id="resultContent" class="hidden">
                         <!-- Status -->
                         <div id="resultStatus" class="p-6 text-center bg-green-50 dark:bg-green-900/20">
@@ -470,6 +483,15 @@
 
         function showResult(r) {
             document.getElementById('resultEmpty').classList.add('hidden');
+            
+            // Kusurları işaretlenmiş fotoğrafı göster
+            if (r.annotated_image) {
+                document.getElementById('annotatedImage').src = 'data:image/jpeg;base64,' + r.annotated_image;
+                document.getElementById('annotatedImageContainer').classList.remove('hidden');
+            } else {
+                document.getElementById('annotatedImageContainer').classList.add('hidden');
+            }
+            
             document.getElementById('resultContent').classList.remove('hidden');
 
             const statusDiv = document.getElementById('resultStatus');
@@ -576,7 +598,16 @@
             await fetch(`${API}/history`, { method: 'DELETE' });
             document.getElementById('resultEmpty').classList.remove('hidden');
             document.getElementById('resultContent').classList.add('hidden');
+            document.getElementById('annotatedImageContainer').classList.add('hidden');
             await fetchDashboard();
+        }
+
+        function downloadImage() {
+            const img = document.getElementById('annotatedImage');
+            const link = document.createElement('a');
+            link.href = img.src;
+            link.download = `Aygun_Analiz_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.jpg`;
+            link.click();
         }
     </script>
 </body>

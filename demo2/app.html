@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ColorQC Pro | Aygün Cerrahi Aletler</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+    <!-- Header -->
+    <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold">ColorQC Pro</h1>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Aygün Cerrahi Aletler | Hibrit AI Kalite Kontrol</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="qualityScore" class="px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-semibold">%98.5 Kalite</span>
+                <button onclick="toggleDarkMode()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <svg class="w-5 h-5 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    <svg class="w-5 h-5 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-4">
+        <!-- Tabs -->
+        <div class="flex gap-6 border-b border-gray-200 dark:border-gray-700 mb-4">
+            <button onclick="showTab('analysis')" id="tab-analysis" class="pb-3 text-sm font-medium tab-active">Analiz</button>
+            <button onclick="showTab('heatmaps')" id="tab-heatmaps" class="pb-3 text-sm font-medium text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Haritalar</button>
+            <button onclick="showTab('reports')" id="tab-reports" class="pb-3 text-sm font-medium text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Raporlar</button>
+            <button onclick="showTab('trends')" id="tab-trends" class="pb-3 text-sm font-medium text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Trend</button>
+        </div>
+
+        <!-- Analysis Tab -->
+        <div id="panel-analysis" class="fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <!-- Video -->
+                <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div class="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                        <span class="font-medium text-sm">Canlı Görüntü</span>
+                        <select id="productSelect" class="text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5">
+                            <option value="AYG-STR-001">Sterilizasyon Konteyneri</option>
+                            <option value="AYG-ORT-002">Ortopedi Set Kapağı</option>
+                            <option value="AYG-FRC-003">Forseps Gövdesi</option>
+                            <option value="AYG-ACL-005">Acil Set Kapağı</option>
+                            <option value="AYG-NRO-006">Nöroşirürji Set</option>
+                        </select>
+                    </div>
+                    <div class="relative aspect-video bg-gray-900">
+                        <img id="videoFeed" class="w-full h-full object-contain hidden">
+                        <div id="videoPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
+                            <svg class="w-16 h-16 mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <p class="text-sm">Kamerayı başlatın</p>
+                        </div>
+                    </div>
+                    <div class="p-3 border-t border-gray-200 dark:border-gray-700 flex gap-2">
+                        <button onclick="toggleCamera()" id="btnCamera" class="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            Kamera
+                        </button>
+                        <button onclick="runAnalysis()" id="btnAnalyze" class="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-medium text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                            Analiz Et
+                        </button>
+                        <button onclick="runBatch()" class="flex items-center justify-center gap-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-white px-4 py-2.5 rounded-lg font-medium text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                            Demo
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Result Panel -->
+                <div class="space-y-4">
+                    <!-- Status -->
+                    <div id="resultCard" class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <div id="statusBanner" class="p-4 text-center bg-gray-100 dark:bg-gray-700">
+                            <span id="statusText" class="text-xl font-bold text-gray-400">Bekleniyor</span>
+                            <p id="confidenceText" class="text-sm text-gray-400 mt-1">Analiz için butona tıklayın</p>
+                        </div>
+                        <div class="p-4 space-y-3">
+                            <!-- Delta E -->
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-gray-500 dark:text-gray-400">Renk Farkı (ΔE)</span>
+                                    <span id="deltaEVal" class="font-semibold">--</span>
+                                </div>
+                                <div class="h-2 bg-gray-100 dark:bg-gray-700 rounded-full">
+                                    <div id="deltaEBar" class="h-full bg-green-500 rounded-full transition-all" style="width:0%"></div>
+                                </div>
+                            </div>
+                            <!-- LAB -->
+                            <div class="grid grid-cols-3 gap-2">
+                                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 text-center">
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">L*</p>
+                                    <p id="labL" class="font-mono font-semibold">--</p>
+                                </div>
+                                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 text-center">
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">a*</p>
+                                    <p id="labA" class="font-mono font-semibold">--</p>
+                                </div>
+                                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-2 text-center">
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">b*</p>
+                                    <p id="labB" class="font-mono font-semibold">--</p>
+                                </div>
+                            </div>
+                            <!-- Gloss -->
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-gray-500 dark:text-gray-400">Parlaklık</span>
+                                    <span id="glossVal" class="font-semibold">-- GU</span>
+                                </div>
+                                <div class="h-2 bg-gray-100 dark:bg-gray-700 rounded-full">
+                                    <div id="glossBar" class="h-full bg-blue-500 rounded-full transition-all" style="width:0%"></div>
+                                </div>
+                            </div>
+                            <!-- Defects -->
+                            <div class="pt-2 border-t border-gray-100 dark:border-gray-700">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-gray-500 dark:text-gray-400">Kusurlar</span>
+                                    <span id="defectBadge" class="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">0</span>
+                                </div>
+                                <div id="defectList" class="text-sm mt-1 text-green-600 dark:text-green-400">✓ Temiz</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Annotated Image -->
+                    <div id="annotatedContainer" class="hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        <img id="annotatedImg" class="w-full" alt="Analiz">
+                        <div class="p-2 flex gap-2">
+                            <button onclick="downloadImage('annotatedImg')" class="flex-1 text-xs bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg">İndir</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Heatmaps Tab -->
+        <div id="panel-heatmaps" class="hidden fade-in">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div class="p-3 border-b border-gray-200 dark:border-gray-700 font-medium text-sm">Renk Sapma Haritası (ΔE)</div>
+                    <div id="colorHeatmapContainer" class="aspect-video bg-gray-100 dark:bg-gray-900 flex items-center justify-center text-gray-400 text-sm">Analiz yapılmadı</div>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div class="p-3 border-b border-gray-200 dark:border-gray-700 font-medium text-sm">Parlaklık Haritası</div>
+                    <div id="glossMapContainer" class="aspect-video bg-gray-100 dark:bg-gray-900 flex items-center justify-center text-gray-400 text-sm">Analiz yapılmadı</div>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div class="p-3 border-b border-gray-200 dark:border-gray-700 font-medium text-sm">Kusur Yoğunluk Haritası</div>
+                    <div id="defectHeatmapContainer" class="aspect-video bg-gray-100 dark:bg-gray-900 flex items-center justify-center text-gray-400 text-sm">Analiz yapılmadı</div>
+                </div>
+            </div>
+            <div class="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                <h3 class="font-semibold text-blue-800 dark:text-blue-300 mb-2">Harita Açıklamaları</h3>
+                <div class="grid grid-cols-3 gap-4 text-sm text-blue-700 dark:text-blue-400">
+                    <div><b>Renk Haritası:</b> Mavi=düşük ΔE (iyi), Kırmızı=yüksek ΔE (kötü)</div>
+                    <div><b>Parlaklık:</b> Mor=düşük parlaklık, Sarı=yüksek parlaklık</div>
+                    <div><b>Kusur:</b> Siyah=temiz, Kırmızı/Sarı=kusur yoğunluğu</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Tab -->
+        <div id="panel-reports" class="hidden fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                    <h3 class="font-semibold mb-4">Son Analiz Raporu</h3>
+                    <div id="reportContent" class="space-y-3 text-sm">
+                        <p class="text-gray-500">Analiz yapıldığında rapor burada görünecek.</p>
+                    </div>
+                    <button onclick="exportReport()" class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium">PDF Olarak İndir</button>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                    <h3 class="font-semibold mb-4">Günlük Özet</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center">
+                            <p class="text-2xl font-bold text-green-600" id="rptApproved">0</p>
+                            <p class="text-xs text-green-600">Onaylı</p>
+                        </div>
+                        <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center">
+                            <p class="text-2xl font-bold text-red-600" id="rptRejected">0</p>
+                            <p class="text-xs text-red-600">Reddedilen</p>
+                        </div>
+                        <div class="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 text-center">
+                            <p class="text-2xl font-bold text-amber-600" id="rptReview">0</p>
+                            <p class="text-xs text-amber-600">İnceleme</p>
+                        </div>
+                        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
+                            <p class="text-2xl font-bold text-blue-600" id="rptAvgDE">0.0</p>
+                            <p class="text-xs text-blue-600">Ort. ΔE</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trends Tab -->
+        <div id="panel-trends" class="hidden fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                    <h3 class="font-semibold mb-4">ΔE Trend Grafiği</h3>
+                    <div class="h-64"><canvas id="trendChart"></canvas></div>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                    <h3 class="font-semibold mb-4">Kalite Dağılımı</h3>
+                    <div class="h-64"><canvas id="pieChart"></canvas></div>
+                </div>
+            </div>
+            <div id="trendWarning" class="hidden mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-700">
+                <p class="text-amber-800 dark:text-amber-300 font-medium" id="trendWarningText"></p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API = 'http://localhost:8001';
+        let cameraOn = false, trendChart = null, pieChart = null, lastResult = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
+            initCharts();
+            fetchDashboard();
+        });
+
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+            localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+        }
+
+        function showTab(name) {
+            ['analysis', 'heatmaps', 'reports', 'trends'].forEach(t => {
+                document.getElementById('panel-' + t).classList.toggle('hidden', t !== name);
+                document.getElementById('tab-' + t).classList.toggle('tab-active', t === name);
+                document.getElementById('tab-' + t).classList.toggle('text-gray-500', t !== name);
+            });
+        }
+
+        function initCharts() {
+            const isDark = document.documentElement.classList.contains('dark');
+            trendChart = new Chart(document.getElementById('trendChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [
+                    { label: 'ΔE', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.4 },
+                    { label: 'Tolerans', data: [], borderColor: '#ef4444', borderDash: [5,5], fill: false, pointRadius: 0 }
+                ]},
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: isDark ? '#9ca3af' : '#6b7280' } } } }
+            });
+            pieChart = new Chart(document.getElementById('pieChart'), {
+                type: 'doughnut',
+                data: { labels: ['Onay', 'İnceleme', 'Red'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'] }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        async function toggleCamera() {
+            const btn = document.getElementById('btnCamera');
+            const video = document.getElementById('videoFeed');
+            const placeholder = document.getElementById('videoPlaceholder');
+            if (!cameraOn) {
+                await fetch(`${API}/camera/init`, { method: 'POST' });
+                video.src = `${API}/video_feed`;
+                video.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+                cameraOn = true;
+                btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg> Kapat';
+                btn.classList.replace('bg-blue-600', 'bg-red-600');
+            } else {
+                await fetch(`${API}/camera/release`, { method: 'POST' });
+                video.src = '';
+                video.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+                cameraOn = false;
+                btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Kamera';
+                btn.classList.replace('bg-red-600', 'bg-blue-600');
+            }
+        }
+
+        async function runAnalysis() {
+            const code = document.getElementById('productSelect').value;
+            const btn = document.getElementById('btnAnalyze');
+            btn.disabled = true;
+            btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Analiz...';
+            try {
+                const res = await fetch(`${API}/analyze?product_code=${code}`, { method: 'POST' });
+                const r = await res.json();
+                lastResult = r;
+                showResult(r);
+                showHeatmaps(r);
+                showReport(r);
+                await fetchDashboard();
+            } catch (e) { console.error(e); }
+            btn.disabled = false;
+            btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg> Analiz Et';
+        }
+
+        async function runBatch() {
+            await fetch(`${API}/analyze/batch?count=20`, { method: 'POST' });
+            await fetchDashboard();
+        }
+
+        function showResult(r) {
+            const banner = document.getElementById('statusBanner');
+            const text = document.getElementById('statusText');
+            if (r.overall_status === 'ONAY') {
+                banner.className = 'p-4 text-center bg-green-100 dark:bg-green-900/30';
+                text.className = 'text-xl font-bold text-green-600';
+                text.textContent = 'ONAY';
+            } else if (r.overall_status === 'INCELEME') {
+                banner.className = 'p-4 text-center bg-amber-100 dark:bg-amber-900/30';
+                text.className = 'text-xl font-bold text-amber-600';
+                text.textContent = 'İNCELEME';
+            } else {
+                banner.className = 'p-4 text-center bg-red-100 dark:bg-red-900/30';
+                text.className = 'text-xl font-bold text-red-600';
+                text.textContent = 'RED';
+            }
+            document.getElementById('confidenceText').textContent = `Güven: %${r.confidence}`;
+            document.getElementById('deltaEVal').textContent = r.delta_e;
+            document.getElementById('deltaEBar').style.width = `${Math.min(100, r.delta_e / 10 * 100)}%`;
+            document.getElementById('labL').textContent = r.measured_lab.L;
+            document.getElementById('labA').textContent = r.measured_lab.a;
+            document.getElementById('labB').textContent = r.measured_lab.b;
+            document.getElementById('glossVal').textContent = r.gloss_value + ' GU';
+            document.getElementById('glossBar').style.width = r.gloss_value + '%';
+            document.getElementById('defectBadge').textContent = r.defect_count;
+            document.getElementById('defectList').innerHTML = r.defect_count === 0 ? '✓ Temiz' : r.defects_detected.map(d => `• ${d.name}`).join('<br>');
+            if (r.annotated_image) {
+                document.getElementById('annotatedImg').src = 'data:image/jpeg;base64,' + r.annotated_image;
+                document.getElementById('annotatedContainer').classList.remove('hidden');
+            }
+        }
+
+        function showHeatmaps(r) {
+            if (r.color_heatmap) document.getElementById('colorHeatmapContainer').innerHTML = `<img src="data:image/jpeg;base64,${r.color_heatmap}" class="w-full h-full object-contain">`;
+            if (r.gloss_map) document.getElementById('glossMapContainer').innerHTML = `<img src="data:image/jpeg;base64,${r.gloss_map}" class="w-full h-full object-contain">`;
+            if (r.defect_heatmap) document.getElementById('defectHeatmapContainer').innerHTML = `<img src="data:image/jpeg;base64,${r.defect_heatmap}" class="w-full h-full object-contain">`;
+        }
+
+        function showReport(r) {
+            document.getElementById('reportContent').innerHTML = `
+                <div class="grid grid-cols-2 gap-2">
+                    <div><b>Ürün:</b> ${r.product_name}</div>
+                    <div><b>Kod:</b> ${r.product_code}</div>
+                    <div><b>Tarih:</b> ${new Date(r.timestamp).toLocaleString('tr-TR')}</div>
+                    <div><b>Durum:</b> <span class="${r.overall_status === 'ONAY' ? 'text-green-600' : r.overall_status === 'INCELEME' ? 'text-amber-600' : 'text-red-600'}">${r.overall_status}</span></div>
+                </div>
+                <hr class="my-2 border-gray-200 dark:border-gray-700">
+                <div><b>Renk Analizi:</b></div>
+                <div class="pl-3">L*: ${r.measured_lab.L} | a*: ${r.measured_lab.a} | b*: ${r.measured_lab.b}</div>
+                <div class="pl-3">ΔE: ${r.delta_e} (Tolerans: ${r.delta_e_tolerance})</div>
+                <div><b>Parlaklık:</b> ${r.gloss_value} GU (${r.gloss_range})</div>
+                <div><b>Kusurlar:</b> ${r.defect_count} adet</div>
+                <div><b>Öneri:</b> ${r.recommendation}</div>
+            `;
+        }
+
+        async function fetchDashboard() {
+            try {
+                const res = await fetch(`${API}/dashboard`);
+                const d = await res.json();
+                document.getElementById('qualityScore').textContent = `%${d.quality_rate || 0} Kalite`;
+                document.getElementById('rptApproved').textContent = d.approved;
+                document.getElementById('rptRejected').textContent = d.rejected;
+                document.getElementById('rptReview').textContent = d.review;
+                document.getElementById('rptAvgDE').textContent = d.avg_delta_e;
+                const data = d.recent_inspections || [];
+                trendChart.data.labels = data.map((_, i) => i + 1).reverse();
+                trendChart.data.datasets[0].data = data.map(i => i.delta_e).reverse();
+                trendChart.data.datasets[1].data = data.map(i => i.delta_e_tolerance).reverse();
+                trendChart.update();
+                pieChart.data.datasets[0].data = [d.approved, d.review, d.rejected];
+                pieChart.update();
+                if (d.trend_warning) {
+                    document.getElementById('trendWarning').classList.remove('hidden');
+                    document.getElementById('trendWarningText').textContent = d.trend_warning;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function downloadImage(id) {
+            const img = document.getElementById(id);
+            const link = document.createElement('a');
+            link.href = img.src;
+            link.download = `Aygun_${id}_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.jpg`;
+            link.click();
+        }
+
+        function exportReport() {
+            if (!lastResult) { alert('Önce analiz yapın'); return; }
+            const content = document.getElementById('reportContent').innerText;
+            const blob = new Blob([`ColorQC Raporu\n${'='.repeat(40)}\n\n${content}`], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Aygun_Rapor_${new Date().toISOString().slice(0,10)}.txt`;
+            link.click();
+        }
+    </script>
+</body>
+</html>
