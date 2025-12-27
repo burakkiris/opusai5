@@ -76,16 +76,25 @@
                             <p class="text-sm">Kamerayı başlatın</p>
                         </div>
                     </div>
-                    <div class="p-3 border-t border-gray-200 dark:border-gray-700 flex gap-2">
-                        <button onclick="toggleCamera()" id="btnCamera" class="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium text-sm">
+                    <div class="p-3 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">
+                        <button onclick="toggleCamera()" id="btnCamera" class="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium text-sm">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                             Kamera
                         </button>
-                        <button onclick="runAnalysis()" id="btnAnalyze" class="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-medium text-sm">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-                            Analiz Et
+                        <button onclick="toggleHeatmapMode()" id="btnHeatmap" class="flex-1 flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg font-medium text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"/></svg>
+                            Isı Haritası
                         </button>
-                        <button onclick="runBatch()" class="flex items-center justify-center gap-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-white px-4 py-2.5 rounded-lg font-medium text-sm">
+                        <button onclick="runAnalysis()" id="btnAnalyze" class="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg font-medium text-sm">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                            Analiz
+                        </button>
+                        <label class="flex-1 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg font-medium text-sm cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                            Yükle
+                            <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="uploadImage(event)">
+                        </label>
+                        <button onclick="runBatch()" class="flex items-center justify-center gap-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-white px-3 py-2 rounded-lg font-medium text-sm">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                             Demo
                         </button>
@@ -319,6 +328,73 @@
         async function runBatch() {
             await fetch(`${API}/analyze/batch?count=20`, { method: 'POST' });
             await fetchDashboard();
+        }
+
+        let heatmapOn = false;
+        function toggleHeatmapMode() {
+            const btn = document.getElementById('btnHeatmap');
+            const video = document.getElementById('videoFeed');
+            const placeholder = document.getElementById('videoPlaceholder');
+            
+            if (!heatmapOn) {
+                // Isı haritası modunu aç
+                const colorCode = getColorCodeForProduct(document.getElementById('productSelect').value);
+                video.src = `${API}/heatmap_feed?color_code=${colorCode}`;
+                video.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+                heatmapOn = true;
+                cameraOn = false;
+                btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg> Kapat';
+                btn.classList.replace('bg-orange-500', 'bg-red-600');
+                document.getElementById('btnCamera').classList.replace('bg-red-600', 'bg-blue-600');
+            } else {
+                video.src = '';
+                video.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+                heatmapOn = false;
+                btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"/></svg> Isı Haritası';
+                btn.classList.replace('bg-red-600', 'bg-orange-500');
+            }
+        }
+
+        function getColorCodeForProduct(code) {
+            const map = {
+                'AYG-STR-001': 'MAVI', 'AYG-ORT-002': 'YESIL', 'AYG-FRC-003': 'SIYAH',
+                'AYG-ACL-005': 'KIRMIZI', 'AYG-NRO-006': 'SARI'
+            };
+            return map[code] || 'MAVI';
+        }
+
+        async function uploadImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const code = document.getElementById('productSelect').value;
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const res = await fetch(`${API}/analyze/upload?product_code=${code}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const r = await res.json();
+                lastResult = r;
+                showResult(r);
+                showHeatmaps(r);
+                showReport(r);
+                
+                // Yüklenen görseli video alanında göster
+                const video = document.getElementById('videoFeed');
+                const placeholder = document.getElementById('videoPlaceholder');
+                if (r.annotated_image) {
+                    video.src = 'data:image/jpeg;base64,' + r.annotated_image;
+                    video.classList.remove('hidden');
+                    placeholder.classList.add('hidden');
+                }
+            } catch (e) { console.error(e); alert('Görsel yüklenemedi'); }
+            
+            event.target.value = '';
         }
 
         function showResult(r) {
