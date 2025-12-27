@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ColorQC | Aygün Cerrahi Aletler - Renk Kalite Kontrol</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-aygun { background: linear-gradient(135deg, #1e3a5f 0%, #0d2137 100%); }
+        .card { background: rgba(30, 58, 95, 0.5); backdrop-filter: blur(10px); }
+        .status-onay { background: linear-gradient(135deg, #059669 0%, #047857 100%); }
+        .status-inceleme { background: linear-gradient(135deg, #d97706 0%, #b45309 100%); }
+        .status-red { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); }
+        @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
+        .pulse-ring { animation: pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    </style>
+</head>
+<body class="min-h-screen gradient-aygun text-white">
+    
+    <!-- Header -->
+    <header class="border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-2">
+                        <div class="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
+                            <i data-lucide="palette" class="w-6 h-6 text-white"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold">ColorQC</h1>
+                            <p class="text-xs text-blue-300">Aygün Cerrahi Aletler</p>
+                        </div>
+                    </div>
+                    <div class="hidden md:block h-8 w-px bg-white/20"></div>
+                    <span class="hidden md:block text-sm text-blue-200">Hibrit AI Tabanlı Renk & Yüzey Kalite Kontrol</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div id="cameraStatus" class="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-full text-sm flex items-center gap-2">
+                        <span class="w-2 h-2 bg-red-400 rounded-full"></span>
+                        Kamera Kapalı
+                    </div>
+                    <div id="systemTime" class="text-sm text-blue-300"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-4">
+        <!-- Stats Row -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+            <div class="card rounded-xl p-3 border border-white/10">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-blue-300 text-xs">Toplam Kontrol</p>
+                        <p id="statTotal" class="text-2xl font-bold">0</p>
+                    </div>
+                    <i data-lucide="clipboard-list" class="w-8 h-8 text-blue-400 opacity-50"></i>
+                </div>
+            </div>
+            <div class="card rounded-xl p-3 border border-white/10">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-green-300 text-xs">Onay</p>
+                        <p id="statApproved" class="text-2xl font-bold text-green-400">0</p>
+                    </div>
+                    <i data-lucide="check-circle-2" class="w-8 h-8 text-green-400 opacity-50"></i>
+                </div>
+            </div>
+            <div class="card rounded-xl p-3 border border-white/10">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-yellow-300 text-xs">İnceleme</p>
+                        <p id="statReview" class="text-2xl font-bold text-yellow-400">0</p>
+                    </div>
+                    <i data-lucide="alert-circle" class="w-8 h-8 text-yellow-400 opacity-50"></i>
+                </div>
+            </div>
+            <div class="card rounded-xl p-3 border border-white/10">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-red-300 text-xs">Red</p>
+                        <p id="statRejected" class="text-2xl font-bold text-red-400">0</p>
+                    </div>
+                    <i data-lucide="x-circle" class="w-8 h-8 text-red-400 opacity-50"></i>
+                </div>
+            </div>
+            <div class="card rounded-xl p-3 border border-white/10">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-blue-300 text-xs">Ort. ΔE</p>
+                        <p id="statDeltaE" class="text-2xl font-bold">0.00</p>
+                    </div>
+                    <i data-lucide="activity" class="w-8 h-8 text-blue-400 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trend Warning -->
+        <div id="trendWarning" class="hidden mb-4 bg-yellow-500/20 border border-yellow-500/50 rounded-xl p-4">
+            <div class="flex items-center gap-3">
+                <i data-lucide="alert-triangle" class="w-6 h-6 text-yellow-400"></i>
+                <p id="trendWarningText" class="text-yellow-200 text-sm"></p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Video Feed & Controls -->
+            <div class="lg:col-span-2 space-y-4">
+                <div class="card rounded-xl border border-white/10 overflow-hidden">
+                    <div class="p-3 border-b border-white/10 flex items-center justify-between">
+                        <h2 class="font-semibold flex items-center gap-2">
+                            <i data-lucide="video" class="w-5 h-5 text-blue-400"></i>
+                            Görsel Analiz
+                        </h2>
+                        <span class="text-xs text-blue-300">Eloksal Yüzey İnceleme</span>
+                    </div>
+                    
+                    <div class="relative bg-black aspect-video">
+                        <img id="videoFeed" class="w-full h-full object-contain hidden" alt="Video">
+                        <div id="videoPlaceholder" class="absolute inset-0 flex items-center justify-center">
+                            <div class="text-center text-blue-300/50">
+                                <i data-lucide="video-off" class="w-16 h-16 mx-auto mb-2"></i>
+                                <p>Kamera başlatılmadı</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Controls -->
+                    <div class="p-3 border-t border-white/10">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <button onclick="toggleCamera()" id="btnCamera" class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 py-2 px-3 rounded-lg text-sm transition-colors">
+                                <i data-lucide="camera" class="w-4 h-4"></i>
+                                Kamerayı Aç
+                            </button>
+                            <button onclick="toggleAnalysis()" id="btnAnalysis" disabled class="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 py-2 px-3 rounded-lg text-sm transition-colors">
+                                <i data-lucide="scan" class="w-4 h-4"></i>
+                                Analiz Modu
+                            </button>
+                            <button onclick="runAnalysis()" id="btnAnalyze" disabled class="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 py-2 px-3 rounded-lg text-sm transition-colors">
+                                <i data-lucide="zap" class="w-4 h-4"></i>
+                                Analiz Et
+                            </button>
+                            <button onclick="runBatch()" id="btnBatch" class="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 py-2 px-3 rounded-lg text-sm transition-colors">
+                                <i data-lucide="layers" class="w-4 h-4"></i>
+                                Toplu Test
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Selection & Color Reference -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="card rounded-xl p-4 border border-white/10">
+                        <h3 class="font-semibold mb-3 flex items-center gap-2">
+                            <i data-lucide="package" class="w-5 h-5 text-blue-400"></i>
+                            Ürün Seçimi
+                        </h3>
+                        <select id="productSelect" class="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm mb-3">
+                            <option value="AYG-STR-001">AYG-STR-001 - Sterilizasyon Konteyneri Kapağı</option>
+                            <option value="AYG-ORT-002">AYG-ORT-002 - Ortopedi Set Kapağı</option>
+                            <option value="AYG-FRC-003">AYG-FRC-003 - Forseps Gövdesi</option>
+                            <option value="AYG-SCR-004">AYG-SCR-004 - Cerrahi Makas</option>
+                            <option value="AYG-ACL-005">AYG-ACL-005 - Acil Set Kapağı</option>
+                            <option value="AYG-NRO-006">AYG-NRO-006 - Nöroşirürji Set Kapağı</option>
+                        </select>
+                        <div id="productInfo" class="text-xs text-blue-200 space-y-1">
+                            <p><strong>Beklenen Renk:</strong> <span id="expectedColor">Mavi</span></p>
+                            <p><strong>Kalite Seviyesi:</strong> <span id="qualityLevel">Premium</span></p>
+                            <p><strong>Parlaklık Aralığı:</strong> <span id="glossRange">70-90 GU</span></p>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-xl p-4 border border-white/10">
+                        <h3 class="font-semibold mb-3 flex items-center gap-2">
+                            <i data-lucide="droplet" class="w-5 h-5 text-blue-400"></i>
+                            Referans Renk
+                        </h3>
+                        <div class="flex items-center gap-3">
+                            <div id="refColorBox" class="w-16 h-16 rounded-lg border-2 border-white/30" style="background: rgb(0, 102, 178);"></div>
+                            <div class="text-xs space-y-1">
+                                <p><strong>L*:</strong> <span id="refL">45.0</span></p>
+                                <p><strong>a*:</strong> <span id="refA">-5.0</span></p>
+                                <p><strong>b*:</strong> <span id="refB">-35.0</span></p>
+                                <p class="text-blue-300"><strong>Tolerans (ΔE):</strong> <span id="refTol">≤1.5</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delta E Trend Chart -->
+                <div class="card rounded-xl p-4 border border-white/10">
+                    <h3 class="font-semibold mb-3 flex items-center gap-2">
+                        <i data-lucide="trending-up" class="w-5 h-5 text-blue-400"></i>
+                        ΔE Trend Analizi (Son 20 Kontrol)
+                    </h3>
+                    <div class="h-48">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="space-y-4">
+                <!-- Last Result -->
+                <div class="card rounded-xl p-4 border border-white/10">
+                    <h3 class="font-semibold mb-3 flex items-center gap-2">
+                        <i data-lucide="clipboard-check" class="w-5 h-5 text-green-400"></i>
+                        Son Analiz Sonucu
+                    </h3>
+                    
+                    <div id="resultEmpty" class="text-center py-8 text-blue-300/50">
+                        <i data-lucide="scan" class="w-12 h-12 mx-auto mb-2"></i>
+                        <p class="text-sm">Henüz analiz yapılmadı</p>
+                    </div>
+                    
+                    <div id="resultContent" class="hidden space-y-3">
+                        <!-- Status Badge -->
+                        <div id="resultStatus" class="status-onay text-center py-4 rounded-xl">
+                            <div class="relative inline-block">
+                                <span class="absolute inset-0 rounded-full pulse-ring bg-white/30"></span>
+                                <span id="resultStatusText" class="text-2xl font-bold relative">ONAY</span>
+                            </div>
+                            <p id="resultConfidence" class="text-sm opacity-80 mt-1">Güven: %98.5</p>
+                        </div>
+                        
+                        <!-- Color Analysis -->
+                        <div class="bg-white/5 rounded-lg p-3">
+                            <p class="text-xs text-blue-300 mb-2">Renk Analizi</p>
+                            <div class="flex items-center gap-3 mb-2">
+                                <div id="measuredColorBox" class="w-10 h-10 rounded border border-white/30"></div>
+                                <div class="flex-1">
+                                    <div class="flex justify-between text-sm">
+                                        <span>ΔE (CIEDE2000)</span>
+                                        <span id="deltaEValue" class="font-bold text-green-400">1.2</span>
+                                    </div>
+                                    <div class="w-full bg-white/10 rounded-full h-2 mt-1">
+                                        <div id="deltaEBar" class="bg-green-500 h-2 rounded-full" style="width: 30%;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 text-xs text-center">
+                                <div class="bg-white/5 rounded p-1">
+                                    <p class="text-blue-300">L*</p>
+                                    <p id="measuredL" class="font-mono">45.2</p>
+                                </div>
+                                <div class="bg-white/5 rounded p-1">
+                                    <p class="text-blue-300">a*</p>
+                                    <p id="measuredA" class="font-mono">-4.8</p>
+                                </div>
+                                <div class="bg-white/5 rounded p-1">
+                                    <p class="text-blue-300">b*</p>
+                                    <p id="measuredB" class="font-mono">-34.5</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Gloss Analysis -->
+                        <div class="bg-white/5 rounded-lg p-3">
+                            <div class="flex justify-between items-center">
+                                <p class="text-xs text-blue-300">Parlaklık (Gloss)</p>
+                                <span id="glossStatus" class="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded">GEÇTİ</span>
+                            </div>
+                            <div class="flex items-center gap-2 mt-2">
+                                <span id="glossValue" class="text-2xl font-bold">78</span>
+                                <span class="text-sm text-blue-300">GU</span>
+                                <div class="flex-1 ml-2">
+                                    <div class="w-full bg-white/10 rounded-full h-2">
+                                        <div id="glossBar" class="bg-blue-500 h-2 rounded-full" style="width: 78%;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Defects -->
+                        <div id="defectsSection" class="bg-white/5 rounded-lg p-3">
+                            <div class="flex justify-between items-center mb-2">
+                                <p class="text-xs text-blue-300">Yüzey Kusurları</p>
+                                <span id="defectCount" class="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded">0 tespit</span>
+                            </div>
+                            <div id="defectList" class="space-y-1 text-xs">
+                                <p class="text-green-400">✓ Kusur tespit edilmedi</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Recommendation -->
+                        <div id="recommendation" class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                            <p class="text-xs text-blue-300 mb-1">Öneri</p>
+                            <p id="recommendationText" class="text-sm">Ürün kalite standartlarına uygun.</p>
+                        </div>
+                        
+                        <!-- Timing -->
+                        <div class="flex justify-between text-xs text-blue-300">
+                            <span id="resultTime">-- ms</span>
+                            <span id="resultTimestamp">--:--:--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent History -->
+                <div class="card rounded-xl p-4 border border-white/10">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-semibold flex items-center gap-2">
+                            <i data-lucide="history" class="w-5 h-5 text-orange-400"></i>
+                            Son Kontroller
+                        </h3>
+                        <button onclick="clearHistory()" class="text-xs text-blue-300 hover:text-white">Temizle</button>
+                    </div>
+                    <div id="historyList" class="space-y-2 max-h-64 overflow-y-auto">
+                        <p class="text-center text-blue-300/50 text-sm py-4">Geçmiş boş</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-4 text-center text-blue-300/50 text-xs">
+            <p>ColorQC v1.0 - Aygün Cerrahi Aletler için Hibrit AI Tabanlı Kalite Kontrol</p>
+            <p>Problem 2: Yüzey Parlaklığı ve Eloksal Renk Uyumsuzluğu | Takım: OpusAI5</p>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = 'http://localhost:8001';
+        let cameraActive = false;
+        let analysisActive = false;
+        let trendChart = null;
+
+        const PRODUCTS = {
+            'AYG-STR-001': { color: 'MAVI', quality: 'Premium', gloss: '70-90 GU', rgb: [0, 102, 178], lab: {L: 45, a: -5, b: -35}, tol: 1.5 },
+            'AYG-ORT-002': { color: 'Yeşil', quality: 'Premium', gloss: '70-90 GU', rgb: [0, 153, 76], lab: {L: 50, a: -40, b: 30}, tol: 1.5 },
+            'AYG-FRC-003': { color: 'Gri', quality: 'Standard', gloss: '40-60 GU', rgb: [140, 140, 140], lab: {L: 60, a: 0, b: 0}, tol: 4.0 },
+            'AYG-SCR-004': { color: 'Gri', quality: 'Standard', gloss: '50-70 GU', rgb: [140, 140, 140], lab: {L: 60, a: 0, b: 0}, tol: 4.0 },
+            'AYG-ACL-005': { color: 'Kırmızı', quality: 'Premium', gloss: '75-95 GU', rgb: [204, 51, 51], lab: {L: 40, a: 50, b: 30}, tol: 1.5 },
+            'AYG-NRO-006': { color: 'Sarı', quality: 'Premium', gloss: '70-90 GU', rgb: [255, 204, 0], lab: {L: 85, a: -5, b: 80}, tol: 1.5 }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            updateProductInfo();
+            initTrendChart();
+            fetchDashboard();
+            updateSystemTime();
+            setInterval(updateSystemTime, 1000);
+        });
+
+        document.getElementById('productSelect').addEventListener('change', updateProductInfo);
+
+        function updateSystemTime() {
+            document.getElementById('systemTime').textContent = new Date().toLocaleTimeString('tr-TR');
+        }
+
+        function updateProductInfo() {
+            const code = document.getElementById('productSelect').value;
+            const p = PRODUCTS[code];
+            document.getElementById('expectedColor').textContent = p.color;
+            document.getElementById('qualityLevel').textContent = p.quality;
+            document.getElementById('glossRange').textContent = p.gloss;
+            document.getElementById('refColorBox').style.background = `rgb(${p.rgb.join(',')})`;
+            document.getElementById('refL').textContent = p.lab.L;
+            document.getElementById('refA').textContent = p.lab.a;
+            document.getElementById('refB').textContent = p.lab.b;
+            document.getElementById('refTol').textContent = `≤${p.tol}`;
+        }
+
+        function initTrendChart() {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'ΔE Değeri',
+                        data: [],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'Tolerans',
+                        data: [],
+                        borderColor: '#ef4444',
+                        borderDash: [5, 5],
+                        fill: false,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#94a3b8' } } },
+                    scales: {
+                        x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' }, min: 0, max: 10 }
+                    }
+                }
+            });
+        }
+
+        async function toggleCamera() {
+            const btn = document.getElementById('btnCamera');
+            const status = document.getElementById('cameraStatus');
+            const video = document.getElementById('videoFeed');
+            const placeholder = document.getElementById('videoPlaceholder');
+
+            if (!cameraActive) {
+                btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Başlatılıyor...';
+                try {
+                    await fetch(`${API_URL}/camera/init`, { method: 'POST' });
+                    video.src = `${API_URL}/video_feed`;
+                    video.classList.remove('hidden');
+                    placeholder.classList.add('hidden');
+                    cameraActive = true;
+                    btn.innerHTML = '<i data-lucide="camera-off" class="w-4 h-4"></i> Kapat';
+                    btn.className = 'flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 py-2 px-3 rounded-lg text-sm transition-colors';
+                    status.innerHTML = '<span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span> Kamera Aktif';
+                    status.className = 'px-3 py-1.5 bg-green-500/20 text-green-400 rounded-full text-sm flex items-center gap-2';
+                    document.getElementById('btnAnalysis').disabled = false;
+                    document.getElementById('btnAnalyze').disabled = false;
+                } catch (e) {
+                    alert('Kamera başlatılamadı');
+                    btn.innerHTML = '<i data-lucide="camera" class="w-4 h-4"></i> Kamerayı Aç';
+                }
+            } else {
+                video.src = '';
+                video.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+                cameraActive = false;
+                btn.innerHTML = '<i data-lucide="camera" class="w-4 h-4"></i> Kamerayı Aç';
+                btn.className = 'flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 py-2 px-3 rounded-lg text-sm transition-colors';
+                status.innerHTML = '<span class="w-2 h-2 bg-red-400 rounded-full"></span> Kamera Kapalı';
+                status.className = 'px-3 py-1.5 bg-red-500/20 text-red-400 rounded-full text-sm flex items-center gap-2';
+                document.getElementById('btnAnalysis').disabled = true;
+                document.getElementById('btnAnalyze').disabled = true;
+            }
+            lucide.createIcons();
+        }
+
+        async function toggleAnalysis() {
+            const btn = document.getElementById('btnAnalysis');
+            if (!analysisActive) {
+                await fetch(`${API_URL}/analyze/start`, { method: 'POST' });
+                analysisActive = true;
+                btn.innerHTML = '<i data-lucide="pause" class="w-4 h-4"></i> Durdur';
+                btn.className = 'flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 py-2 px-3 rounded-lg text-sm transition-colors';
+            } else {
+                await fetch(`${API_URL}/analyze/stop`, { method: 'POST' });
+                analysisActive = false;
+                btn.innerHTML = '<i data-lucide="scan" class="w-4 h-4"></i> Analiz Modu';
+                btn.className = 'flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 py-2 px-3 rounded-lg text-sm transition-colors';
+            }
+            lucide.createIcons();
+        }
+
+        async function runAnalysis() {
+            const code = document.getElementById('productSelect').value;
+            const btn = document.getElementById('btnAnalyze');
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Analiz...';
+
+            try {
+                const res = await fetch(`${API_URL}/analyze?product_code=${code}`, { method: 'POST' });
+                const result = await res.json();
+                updateResult(result);
+                await fetchDashboard();
+            } catch (e) {
+                console.error(e);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i data-lucide="zap" class="w-4 h-4"></i> Analiz Et';
+                lucide.createIcons();
+            }
+        }
+
+        async function runBatch() {
+            const btn = document.getElementById('btnBatch');
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> İşleniyor...';
+            try {
+                await fetch(`${API_URL}/analyze/batch?count=20`, { method: 'POST' });
+                await fetchDashboard();
+            } catch (e) { console.error(e); }
+            finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i data-lucide="layers" class="w-4 h-4"></i> Toplu Test';
+                lucide.createIcons();
+            }
+        }
+
+        function updateResult(r) {
+            document.getElementById('resultEmpty').classList.add('hidden');
+            document.getElementById('resultContent').classList.remove('hidden');
+
+            const statusDiv = document.getElementById('resultStatus');
+            const statusText = document.getElementById('resultStatusText');
+            if (r.overall_status === 'ONAY') {
+                statusDiv.className = 'status-onay text-center py-4 rounded-xl';
+                statusText.textContent = 'ONAY';
+            } else if (r.overall_status === 'INCELEME') {
+                statusDiv.className = 'status-inceleme text-center py-4 rounded-xl';
+                statusText.textContent = 'İNCELEME';
+            } else {
+                statusDiv.className = 'status-red text-center py-4 rounded-xl';
+                statusText.textContent = 'RED';
+            }
+            document.getElementById('resultConfidence').textContent = `Güven: %${r.confidence}`;
+
+            // Color
+            const lab = r.measured_lab;
+            document.getElementById('measuredL').textContent = lab.L;
+            document.getElementById('measuredA').textContent = lab.a;
+            document.getElementById('measuredB').textContent = lab.b;
+            document.getElementById('deltaEValue').textContent = r.delta_e;
+            document.getElementById('deltaEValue').className = r.delta_e <= r.delta_e_tolerance ? 'font-bold text-green-400' : 'font-bold text-red-400';
+            const dePercent = Math.min(100, (r.delta_e / 10) * 100);
+            document.getElementById('deltaEBar').style.width = dePercent + '%';
+            document.getElementById('deltaEBar').className = r.delta_e <= r.delta_e_tolerance ? 'bg-green-500 h-2 rounded-full' : 'bg-red-500 h-2 rounded-full';
+
+            // Gloss
+            document.getElementById('glossValue').textContent = r.gloss_value;
+            document.getElementById('glossBar').style.width = r.gloss_value + '%';
+            document.getElementById('glossStatus').textContent = r.gloss_status === 'GECTI' ? 'GEÇTİ' : 'KALDI';
+            document.getElementById('glossStatus').className = r.gloss_status === 'GECTI' ? 'text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded' : 'text-xs px-2 py-0.5 bg-red-500/20 text-red-400 rounded';
+
+            // Defects
+            document.getElementById('defectCount').textContent = r.defect_count + ' tespit';
+            document.getElementById('defectCount').className = r.defect_count === 0 ? 'text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded' : 'text-xs px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded';
+            if (r.defect_count === 0) {
+                document.getElementById('defectList').innerHTML = '<p class="text-green-400">✓ Kusur tespit edilmedi</p>';
+            } else {
+                document.getElementById('defectList').innerHTML = r.defects_detected.map(d => 
+                    `<p class="text-yellow-400">• ${d.name} (${d.severity})</p>`
+                ).join('');
+            }
+
+            // Recommendation
+            document.getElementById('recommendationText').textContent = r.recommendation;
+            document.getElementById('recommendation').className = r.overall_status === 'ONAY' ? 
+                'bg-green-500/10 border border-green-500/30 rounded-lg p-3' :
+                'bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3';
+
+            document.getElementById('resultTime').textContent = r.processing_time_ms + ' ms';
+            document.getElementById('resultTimestamp').textContent = new Date(r.timestamp).toLocaleTimeString('tr-TR');
+        }
+
+        async function fetchDashboard() {
+            try {
+                const res = await fetch(`${API_URL}/dashboard`);
+                const d = await res.json();
+                
+                document.getElementById('statTotal').textContent = d.total_inspections;
+                document.getElementById('statApproved').textContent = d.approved;
+                document.getElementById('statReview').textContent = d.review;
+                document.getElementById('statRejected').textContent = d.rejected;
+                document.getElementById('statDeltaE').textContent = d.avg_delta_e;
+
+                if (d.trend_warning) {
+                    document.getElementById('trendWarning').classList.remove('hidden');
+                    document.getElementById('trendWarningText').textContent = d.trend_warning;
+                } else {
+                    document.getElementById('trendWarning').classList.add('hidden');
+                }
+
+                // Update chart
+                const inspections = d.recent_inspections || [];
+                trendChart.data.labels = inspections.map((_, i) => i + 1).reverse();
+                trendChart.data.datasets[0].data = inspections.map(i => i.delta_e).reverse();
+                trendChart.data.datasets[1].data = inspections.map(i => i.delta_e_tolerance).reverse();
+                trendChart.update();
+
+                // Update history
+                updateHistory(inspections);
+            } catch (e) { console.error(e); }
+        }
+
+        function updateHistory(inspections) {
+            const list = document.getElementById('historyList');
+            if (!inspections || inspections.length === 0) {
+                list.innerHTML = '<p class="text-center text-blue-300/50 text-sm py-4">Geçmiş boş</p>';
+                return;
+            }
+            list.innerHTML = inspections.slice(0, 15).map(i => `
+                <div class="flex items-center justify-between bg-white/5 rounded p-2">
+                    <div class="flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full ${i.overall_status === 'ONAY' ? 'bg-green-500' : i.overall_status === 'INCELEME' ? 'bg-yellow-500' : 'bg-red-500'}"></div>
+                        <div>
+                            <p class="text-xs font-medium">${i.product_code}</p>
+                            <p class="text-xs text-blue-300">ΔE: ${i.delta_e}</p>
+                        </div>
+                    </div>
+                    <span class="text-xs ${i.overall_status === 'ONAY' ? 'text-green-400' : i.overall_status === 'INCELEME' ? 'text-yellow-400' : 'text-red-400'}">
+                        ${i.overall_status}
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        async function clearHistory() {
+            await fetch(`${API_URL}/history`, { method: 'DELETE' });
+            document.getElementById('resultEmpty').classList.remove('hidden');
+            document.getElementById('resultContent').classList.add('hidden');
+            await fetchDashboard();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisionQC | Kamera ile Kalite Kontrol</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .pulse-green { animation: pulseGreen 2s infinite; }
+        @keyframes pulseGreen {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            50% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+        }
+        .pulse-red { animation: pulseRed 2s infinite; }
+        @keyframes pulseRed {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            50% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+    
+    <!-- Header -->
+    <header class="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                        <i data-lucide="scan" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-white">VisionQC <span class="text-blue-400">Camera</span></h1>
+                        <p class="text-xs text-slate-400">Gerçek Zamanlı Görüntü İşleme</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div id="cameraStatus" class="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm flex items-center gap-1">
+                        <span class="w-2 h-2 bg-red-400 rounded-full"></span>
+                        Kamera Kapalı
+                    </div>
+                    <div id="measureStatus" class="hidden px-3 py-1 bg-purple-500/20 text-purple-400 rounded-full text-sm flex items-center gap-1">
+                        <span class="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></span>
+                        Ölçüm Aktif
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-4">
+        <!-- Stats -->
+        <div class="grid grid-cols-4 gap-3 mb-4">
+            <div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                <p class="text-slate-400 text-xs">Toplam</p>
+                <p id="statTotal" class="text-2xl font-bold text-white">0</p>
+            </div>
+            <div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                <p class="text-slate-400 text-xs">Geçti</p>
+                <p id="statPassed" class="text-2xl font-bold text-green-400">0</p>
+            </div>
+            <div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                <p class="text-slate-400 text-xs">Kaldı</p>
+                <p id="statFailed" class="text-2xl font-bold text-red-400">0</p>
+            </div>
+            <div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                <p class="text-slate-400 text-xs">Başarı</p>
+                <p id="statRate" class="text-2xl font-bold text-white">0%</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <!-- Video Feed -->
+            <div class="lg:col-span-2">
+                <div class="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+                    <div class="p-3 border-b border-slate-700 flex items-center justify-between">
+                        <h2 class="text-white font-semibold flex items-center gap-2">
+                            <i data-lucide="video" class="w-5 h-5 text-blue-400"></i>
+                            Canlı Görüntü
+                        </h2>
+                        <div class="flex items-center gap-2">
+                            <span id="fpsCounter" class="text-xs text-slate-400">-- FPS</span>
+                            <span id="ppmValue" class="text-xs text-blue-400">PPM: --</span>
+                        </div>
+                    </div>
+                    
+                    <div class="relative bg-black aspect-video">
+                        <img id="videoFeed" class="w-full h-full object-contain" alt="Video Feed">
+                        <div id="videoPlaceholder" class="absolute inset-0 flex items-center justify-center bg-slate-900">
+                            <div class="text-center text-slate-500">
+                                <i data-lucide="video-off" class="w-16 h-16 mx-auto mb-2 opacity-50"></i>
+                                <p>Kamera başlatılmadı</p>
+                                <p class="text-sm">Başlatmak için "Kamerayı Aç" butonuna tıklayın</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Controls -->
+                    <div class="p-3 border-t border-slate-700">
+                        <div class="flex flex-wrap gap-2">
+                            <button onclick="toggleCamera()" id="btnCamera" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                                <i data-lucide="camera" class="w-4 h-4"></i>
+                                Kamerayı Aç
+                            </button>
+                            <button onclick="toggleMeasuring()" id="btnMeasure" disabled class="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                                <i data-lucide="scan" class="w-4 h-4"></i>
+                                Ölçüm Modu
+                            </button>
+                            <button onclick="captureAndMeasure()" id="btnCapture" disabled class="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                                <i data-lucide="crosshair" class="w-4 h-4"></i>
+                                Ölç
+                            </button>
+                            <button onclick="showCalibrationModal()" id="btnCalibrate" disabled class="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                                <i data-lucide="settings" class="w-4 h-4"></i>
+                                Kalibre Et
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Calibration Info -->
+                <div class="mt-4 bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                    <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                        <i data-lucide="ruler" class="w-5 h-5 text-purple-400"></i>
+                        Kalibrasyon Bilgisi
+                    </h3>
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div class="bg-slate-700/50 rounded-lg p-3">
+                            <p class="text-xs text-slate-400">Piksel/mm</p>
+                            <p id="calPPM" class="text-xl font-bold text-purple-400">10.0</p>
+                        </div>
+                        <div class="bg-slate-700/50 rounded-lg p-3">
+                            <p class="text-xs text-slate-400">Referans Uzunluk</p>
+                            <p id="calRefL" class="text-xl font-bold text-white">85.6mm</p>
+                        </div>
+                        <div class="bg-slate-700/50 rounded-lg p-3">
+                            <p class="text-xs text-slate-400">Referans Genişlik</p>
+                            <p id="calRefW" class="text-xl font-bold text-white">54.0mm</p>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2 text-center">
+                        💡 İpucu: Doğru ölçüm için kredi kartı boyutunda bir referans nesne ile kalibre edin
+                    </p>
+                </div>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="space-y-4">
+                <!-- Product Selection -->
+                <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                    <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                        <i data-lucide="package" class="w-5 h-5 text-blue-400"></i>
+                        Ürün Seçimi
+                    </h3>
+                    <select id="productSelect" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm">
+                        <option value="CUSTOM">Özel Nesne (100x50mm)</option>
+                        <option value="CARD-REF">Kalibrasyon Kartı (85.6x54mm)</option>
+                        <option value="FRC-180-STD">Forseps (180x12mm)</option>
+                        <option value="SCR-120-PRO">Makas (120x15mm)</option>
+                    </select>
+                    
+                    <div id="productSpecs" class="mt-3 p-3 bg-slate-700/50 rounded-lg">
+                        <p id="specName" class="text-sm text-slate-300 mb-2">Özel Nesne</p>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                                <span class="text-slate-400">Nominal L:</span>
+                                <span id="specL" class="text-white ml-1">100mm</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400">Tolerans:</span>
+                                <span id="specLTol" class="text-blue-400 ml-1">±5.0</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400">Nominal W:</span>
+                                <span id="specW" class="text-white ml-1">50mm</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400">Tolerans:</span>
+                                <span id="specWTol" class="text-blue-400 ml-1">±2.5</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Last Result -->
+                <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                    <h3 class="text-white font-semibold mb-3 flex items-center gap-2">
+                        <i data-lucide="clipboard-check" class="w-5 h-5 text-green-400"></i>
+                        Son Ölçüm
+                    </h3>
+                    
+                    <div id="resultEmpty" class="text-center py-6 text-slate-500">
+                        <i data-lucide="scan" class="w-10 h-10 mx-auto mb-2 opacity-50"></i>
+                        <p class="text-sm">Henüz ölçüm yapılmadı</p>
+                    </div>
+                    
+                    <div id="resultContent" class="hidden">
+                        <div id="resultStatus" class="text-center py-4 rounded-lg mb-3 bg-green-500/20">
+                            <span id="resultStatusText" class="text-3xl font-bold text-green-500">GEÇTİ</span>
+                            <p id="resultConfidence" class="text-sm text-slate-400 mt-1">Güven: %98.5</p>
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <div id="measureL" class="flex justify-between items-center p-2 rounded bg-green-500/10">
+                                <span class="text-slate-300 text-sm">Uzunluk</span>
+                                <div class="text-right">
+                                    <span class="font-mono text-green-400">--mm</span>
+                                    <span class="text-xs text-slate-500 ml-1">(+0.0)</span>
+                                </div>
+                            </div>
+                            <div id="measureW" class="flex justify-between items-center p-2 rounded bg-green-500/10">
+                                <span class="text-slate-300 text-sm">Genişlik</span>
+                                <div class="text-right">
+                                    <span class="font-mono text-green-400">--mm</span>
+                                    <span class="text-xs text-slate-500 ml-1">(+0.0)</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3 pt-3 border-t border-slate-700 flex justify-between text-xs text-slate-400">
+                            <span id="resultTime">-- ms</span>
+                            <span id="resultTimestamp">--:--:--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History -->
+                <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-white font-semibold flex items-center gap-2">
+                            <i data-lucide="history" class="w-5 h-5 text-orange-400"></i>
+                            Geçmiş
+                        </h3>
+                        <button onclick="clearHistory()" class="text-xs text-slate-400 hover:text-white">Temizle</button>
+                    </div>
+                    
+                    <div id="historyList" class="space-y-2 max-h-48 overflow-y-auto">
+                        <p class="text-center text-slate-500 text-sm py-4">Geçmiş boş</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-4 text-center text-slate-500 text-xs">
+            <p>VisionQC Camera Demo - Yapay Zeka ile Yerel Dönüşüm Atölyesi 2025</p>
+        </div>
+    </main>
+
+    <!-- Calibration Modal -->
+    <div id="calibrationModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+        <div class="bg-slate-800 rounded-xl p-6 max-w-md w-full mx-4 border border-slate-700">
+            <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <i data-lucide="settings" class="w-6 h-6 text-purple-400"></i>
+                Kalibrasyon
+            </h3>
+            
+            <p class="text-slate-400 text-sm mb-4">
+                Bilinen boyutlarda bir referans nesne (örn: kredi kartı) kamera önüne yerleştirin ve boyutlarını girin.
+            </p>
+            
+            <div class="space-y-3 mb-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Referans Uzunluk (mm)</label>
+                    <input type="number" id="calInputL" value="85.6" step="0.1" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Referans Genişlik (mm)</label>
+                    <input type="number" id="calInputW" value="53.98" step="0.1" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-400 mb-1">Manuel PPM (opsiyonel)</label>
+                    <input type="number" id="calInputPPM" placeholder="Otomatik hesaplanır" step="0.1" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white">
+                </div>
+            </div>
+            
+            <div class="flex gap-2">
+                <button onclick="runAutoCalibration()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg">
+                    Otomatik Kalibre Et
+                </button>
+                <button onclick="runManualCalibration()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-medium py-2 px-4 rounded-lg">
+                    Manuel Ayarla
+                </button>
+            </div>
+            
+            <button onclick="hideCalibrationModal()" class="w-full mt-3 text-slate-400 hover:text-white text-sm">
+                İptal
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let cameraActive = false;
+        let measuringActive = false;
+
+        const PRODUCT_SPECS = {
+            'CUSTOM': { name: 'Özel Nesne', nominal: { length: 100, width: 50 }, tolerance: { length: 5.0, width: 2.5 } },
+            'CARD-REF': { name: 'Kalibrasyon Kartı', nominal: { length: 85.6, width: 53.98 }, tolerance: { length: 0.5, width: 0.5 } },
+            'FRC-180-STD': { name: 'Doku Forsepsi', nominal: { length: 180, width: 12 }, tolerance: { length: 1.0, width: 0.3 } },
+            'SCR-120-PRO': { name: 'Cerrahi Makas', nominal: { length: 120, width: 15 }, tolerance: { length: 0.8, width: 0.4 } }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            updateProductSpecs();
+            fetchDashboard();
+            fetchCalibration();
+        });
+
+        document.getElementById('productSelect').addEventListener('change', updateProductSpecs);
+
+        function updateProductSpecs() {
+            const code = document.getElementById('productSelect').value;
+            const spec = PRODUCT_SPECS[code];
+            document.getElementById('specName').textContent = spec.name;
+            document.getElementById('specL').textContent = spec.nominal.length + 'mm';
+            document.getElementById('specW').textContent = spec.nominal.width + 'mm';
+            document.getElementById('specLTol').textContent = '±' + spec.tolerance.length;
+            document.getElementById('specWTol').textContent = '±' + spec.tolerance.width;
+        }
+
+        async function toggleCamera() {
+            const btn = document.getElementById('btnCamera');
+            const status = document.getElementById('cameraStatus');
+            const video = document.getElementById('videoFeed');
+            const placeholder = document.getElementById('videoPlaceholder');
+
+            if (!cameraActive) {
+                btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Başlatılıyor...';
+                
+                try {
+                    await fetch(`${API_URL}/camera/init`, { method: 'POST' });
+                    
+                    video.src = `${API_URL}/video_feed`;
+                    video.style.display = 'block';
+                    placeholder.style.display = 'none';
+                    
+                    cameraActive = true;
+                    btn.innerHTML = '<i data-lucide="camera-off" class="w-4 h-4"></i> Kamerayı Kapat';
+                    btn.className = 'flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors';
+                    
+                    status.innerHTML = '<span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span> Kamera Aktif';
+                    status.className = 'px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-sm flex items-center gap-1';
+                    
+                    document.getElementById('btnMeasure').disabled = false;
+                    document.getElementById('btnCapture').disabled = false;
+                    document.getElementById('btnCalibrate').disabled = false;
+                    
+                } catch (error) {
+                    console.error('Kamera başlatılamadı:', error);
+                    alert('Kamera başlatılamadı. Lütfen kamera izinlerini kontrol edin.');
+                    btn.innerHTML = '<i data-lucide="camera" class="w-4 h-4"></i> Kamerayı Aç';
+                }
+            } else {
+                try {
+                    await fetch(`${API_URL}/camera/release`, { method: 'POST' });
+                } catch (e) {}
+                
+                video.src = '';
+                video.style.display = 'none';
+                placeholder.style.display = 'flex';
+                
+                cameraActive = false;
+                btn.innerHTML = '<i data-lucide="camera" class="w-4 h-4"></i> Kamerayı Aç';
+                btn.className = 'flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors';
+                
+                status.innerHTML = '<span class="w-2 h-2 bg-red-400 rounded-full"></span> Kamera Kapalı';
+                status.className = 'px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-sm flex items-center gap-1';
+                
+                document.getElementById('btnMeasure').disabled = true;
+                document.getElementById('btnCapture').disabled = true;
+                document.getElementById('btnCalibrate').disabled = true;
+                
+                if (measuringActive) toggleMeasuring();
+            }
+            
+            lucide.createIcons();
+        }
+
+        async function toggleMeasuring() {
+            const btn = document.getElementById('btnMeasure');
+            const status = document.getElementById('measureStatus');
+            
+            if (!measuringActive) {
+                await fetch(`${API_URL}/measure/start`, { method: 'POST' });
+                measuringActive = true;
+                btn.innerHTML = '<i data-lucide="pause" class="w-4 h-4"></i> Ölçümü Durdur';
+                btn.className = 'flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-lg transition-colors';
+                status.classList.remove('hidden');
+            } else {
+                await fetch(`${API_URL}/measure/stop`, { method: 'POST' });
+                measuringActive = false;
+                btn.innerHTML = '<i data-lucide="scan" class="w-4 h-4"></i> Ölçüm Modu';
+                btn.className = 'flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-medium py-2 px-4 rounded-lg transition-colors';
+                status.classList.add('hidden');
+            }
+            
+            lucide.createIcons();
+        }
+
+        async function captureAndMeasure() {
+            const code = document.getElementById('productSelect').value;
+            const btn = document.getElementById('btnCapture');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Ölçülüyor...';
+            
+            try {
+                const res = await fetch(`${API_URL}/measure/capture?product_code=${code}`, { method: 'POST' });
+                
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || 'Ölçüm başarısız');
+                }
+                
+                const result = await res.json();
+                updateLastResult(result);
+                await fetchDashboard();
+                
+            } catch (error) {
+                console.error('Ölçüm hatası:', error);
+                alert('Ölçüm yapılamadı: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i data-lucide="crosshair" class="w-4 h-4"></i> Ölç';
+                lucide.createIcons();
+            }
+        }
+
+        function updateLastResult(result) {
+            document.getElementById('resultEmpty').classList.add('hidden');
+            document.getElementById('resultContent').classList.remove('hidden');
+            
+            const isPassed = result.status === 'PASSED';
+            const statusDiv = document.getElementById('resultStatus');
+            statusDiv.className = `text-center py-4 rounded-lg mb-3 ${isPassed ? 'bg-green-500/20' : 'bg-red-500/20'}`;
+            
+            document.getElementById('resultStatusText').textContent = isPassed ? 'GEÇTİ' : 'KALDI';
+            document.getElementById('resultStatusText').className = `text-3xl font-bold ${isPassed ? 'text-green-500' : 'text-red-500'}`;
+            document.getElementById('resultConfidence').textContent = `Güven: %${result.confidence}`;
+            
+            const lOut = Math.abs(result.deviations.length) > result.tolerance.length;
+            const wOut = Math.abs(result.deviations.width) > result.tolerance.width;
+            
+            const measureL = document.getElementById('measureL');
+            measureL.className = `flex justify-between items-center p-2 rounded ${lOut ? 'bg-red-500/20' : 'bg-green-500/10'}`;
+            measureL.innerHTML = `
+                <span class="text-slate-300 text-sm">Uzunluk</span>
+                <div class="text-right">
+                    <span class="font-mono ${lOut ? 'text-red-400' : 'text-green-400'}">${result.measurements.length}mm</span>
+                    <span class="text-xs text-slate-500 ml-1">(${result.deviations.length >= 0 ? '+' : ''}${result.deviations.length})</span>
+                </div>
+            `;
+            
+            const measureW = document.getElementById('measureW');
+            measureW.className = `flex justify-between items-center p-2 rounded ${wOut ? 'bg-red-500/20' : 'bg-green-500/10'}`;
+            measureW.innerHTML = `
+                <span class="text-slate-300 text-sm">Genişlik</span>
+                <div class="text-right">
+                    <span class="font-mono ${wOut ? 'text-red-400' : 'text-green-400'}">${result.measurements.width}mm</span>
+                    <span class="text-xs text-slate-500 ml-1">(${result.deviations.width >= 0 ? '+' : ''}${result.deviations.width})</span>
+                </div>
+            `;
+            
+            document.getElementById('resultTime').textContent = result.processing_time_ms + ' ms';
+            document.getElementById('resultTimestamp').textContent = new Date(result.timestamp).toLocaleTimeString('tr-TR');
+        }
+
+        async function fetchDashboard() {
+            try {
+                const res = await fetch(`${API_URL}/dashboard`);
+                const data = await res.json();
+                
+                document.getElementById('statTotal').textContent = data.total_inspections || 0;
+                document.getElementById('statPassed').textContent = data.passed || 0;
+                document.getElementById('statFailed').textContent = data.failed || 0;
+                document.getElementById('statRate').textContent = (data.pass_rate || 0).toFixed(1) + '%';
+                
+                updateHistory(data.recent_inspections || []);
+                
+            } catch (error) {
+                console.error('Dashboard yüklenemedi:', error);
+            }
+        }
+
+        async function fetchCalibration() {
+            try {
+                const res = await fetch(`${API_URL}/calibration`);
+                const data = await res.json();
+                
+                document.getElementById('calPPM').textContent = data.pixels_per_mm.toFixed(1);
+                document.getElementById('ppmValue').textContent = 'PPM: ' + data.pixels_per_mm.toFixed(1);
+                document.getElementById('calRefL').textContent = data.reference_width_mm + 'mm';
+                document.getElementById('calRefW').textContent = data.reference_height_mm + 'mm';
+                
+            } catch (error) {
+                console.error('Kalibrasyon bilgisi alınamadı:', error);
+            }
+        }
+
+        function updateHistory(inspections) {
+            const list = document.getElementById('historyList');
+            
+            if (!inspections || inspections.length === 0) {
+                list.innerHTML = '<p class="text-center text-slate-500 text-sm py-4">Geçmiş boş</p>';
+                return;
+            }
+            
+            list.innerHTML = inspections.slice(0, 10).map(i => `
+                <div class="flex items-center justify-between bg-slate-700/30 rounded p-2">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full ${i.status === 'PASSED' ? 'bg-green-500' : 'bg-red-500'}"></div>
+                        <span class="text-white text-xs">${i.measurements.length}x${i.measurements.width}mm</span>
+                    </div>
+                    <span class="text-xs ${i.status === 'PASSED' ? 'text-green-400' : 'text-red-400'}">
+                        ${i.status === 'PASSED' ? 'GEÇTİ' : 'KALDI'}
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        async function clearHistory() {
+            await fetch(`${API_URL}/history`, { method: 'DELETE' });
+            document.getElementById('resultEmpty').classList.remove('hidden');
+            document.getElementById('resultContent').classList.add('hidden');
+            await fetchDashboard();
+        }
+
+        function showCalibrationModal() {
+            document.getElementById('calibrationModal').classList.remove('hidden');
+        }
+
+        function hideCalibrationModal() {
+            document.getElementById('calibrationModal').classList.add('hidden');
+        }
+
+        async function runAutoCalibration() {
+            const refL = document.getElementById('calInputL').value;
+            const refW = document.getElementById('calInputW').value;
+            
+            try {
+                const res = await fetch(`${API_URL}/calibrate?reference_length_mm=${refL}&reference_width_mm=${refW}`, { method: 'POST' });
+                
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail);
+                }
+                
+                const data = await res.json();
+                alert(`Kalibrasyon başarılı!\nYeni PPM: ${data.pixels_per_mm}`);
+                hideCalibrationModal();
+                await fetchCalibration();
+                
+            } catch (error) {
+                alert('Kalibrasyon başarısız: ' + error.message);
+            }
+        }
+
+        async function runManualCalibration() {
+            const ppm = document.getElementById('calInputPPM').value;
+            
+            if (!ppm) {
+                alert('Lütfen manuel PPM değeri girin');
+                return;
+            }
+            
+            try {
+                await fetch(`${API_URL}/calibration/set?pixels_per_mm=${ppm}`, { method: 'POST' });
+                alert(`PPM değeri ${ppm} olarak ayarlandı`);
+                hideCalibrationModal();
+                await fetchCalibration();
+                
+            } catch (error) {
+                alert('Ayarlama başarısız: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
