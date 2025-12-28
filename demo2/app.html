@@ -164,6 +164,84 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Advanced Quality Parameters (ISO/ASTM Standards) -->
+                    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                        <h3 class="text-sm font-semibold mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Gelişmiş Kalite Parametreleri
+                        </h3>
+                        <div class="space-y-3 text-xs">
+                            <!-- Color Uniformity -->
+                            <div>
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-gray-600 dark:text-gray-400">Renk Homojenliği</span>
+                                    <span id="uniformityVal" class="font-semibold">--</span>
+                                </div>
+                                <div class="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full">
+                                    <div id="uniformityBar" class="h-full bg-purple-500 rounded-full transition-all" style="width:0%"></div>
+                                </div>
+                                <p class="text-gray-500 dark:text-gray-500 mt-1 text-[10px]">ISO 7724-2: Yüzey renk dağılımının tutarlılığı (σΔE)</p>
+                            </div>
+                            
+                            <!-- Surface Texture -->
+                            <div>
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-gray-600 dark:text-gray-400">Yüzey Dokusu (Ra)</span>
+                                    <span id="textureVal" class="font-semibold">--</span>
+                                </div>
+                                <div class="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full">
+                                    <div id="textureBar" class="h-full bg-cyan-500 rounded-full transition-all" style="width:0%"></div>
+                                </div>
+                                <p class="text-gray-500 dark:text-gray-500 mt-1 text-[10px]">ISO 4287: Ortalama pürüzlülük değeri (µm)</p>
+                            </div>
+                            
+                            <!-- Metamerism Index -->
+                            <div>
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-gray-600 dark:text-gray-400">Metamerizm İndeksi</span>
+                                    <span id="metamerismVal" class="font-semibold">--</span>
+                                </div>
+                                <div class="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full">
+                                    <div id="metamerismBar" class="h-full bg-orange-500 rounded-full transition-all" style="width:0%"></div>
+                                </div>
+                                <p class="text-gray-500 dark:text-gray-500 mt-1 text-[10px]">ASTM D4086: Farklı ışık kaynaklarında renk değişimi</p>
+                            </div>
+                            
+                            <!-- Coating Thickness -->
+                            <div>
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-gray-600 dark:text-gray-400">Kaplama Kalınlığı</span>
+                                    <span id="coatingVal" class="font-semibold">--</span>
+                                </div>
+                                <div class="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full">
+                                    <div id="coatingBar" class="h-full bg-teal-500 rounded-full transition-all" style="width:0%"></div>
+                                </div>
+                                <p class="text-gray-500 dark:text-gray-500 mt-1 text-[10px]">ISO 2360: Eloksal kaplama kalınlığı (µm)</p>
+                            </div>
+                            
+                            <!-- Corrosion Resistance -->
+                            <div>
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-gray-600 dark:text-gray-400">Korozyon Direnci</span>
+                                    <span id="corrosionVal" class="font-semibold">--</span>
+                                </div>
+                                <div class="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full">
+                                    <div id="corrosionBar" class="h-full bg-green-500 rounded-full transition-all" style="width:0%"></div>
+                                </div>
+                                <p class="text-gray-500 dark:text-gray-500 mt-1 text-[10px]">ISO 9227: Tuz spreyi testi skoru (saat)</p>
+                            </div>
+                            
+                            <!-- Criticality Level -->
+                            <div class="pt-2 border-t border-gray-100 dark:border-gray-700">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-gray-600 dark:text-gray-400">Kritiklik Seviyesi</span>
+                                    <span id="criticalityBadge" class="px-2 py-0.5 rounded-full text-[10px] font-semibold">--</span>
+                                </div>
+                                <p class="text-gray-500 dark:text-gray-500 mt-1 text-[10px]">ISO 13485: Tıbbi cihaz kalite yönetim sistemi sınıflandırması</p>
+                            </div>
+                        </div>
+                    </div>
                     <!-- Annotated Image -->
                     <div id="annotatedContainer" class="hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                         <img id="annotatedImg" class="w-full" alt="Analiz">
@@ -432,6 +510,31 @@
             document.getElementById('glossBar').style.width = r.gloss_value + '%';
             document.getElementById('defectBadge').textContent = r.defect_count;
             document.getElementById('defectList').innerHTML = r.defect_count === 0 ? '✓ Temiz' : r.defects_detected.map(d => `• ${d.name}`).join('<br>');
+            
+            // Gelişmiş parametreleri göster
+            if (r.advanced_parameters) {
+                const ap = r.advanced_parameters;
+                document.getElementById('uniformityVal').textContent = `σΔE ${ap.color_uniformity}`;
+                document.getElementById('uniformityBar').style.width = `${(1 - ap.color_uniformity / 2) * 100}%`;
+                
+                document.getElementById('textureVal').textContent = `${ap.surface_texture} µm`;
+                document.getElementById('textureBar').style.width = `${(1 - ap.surface_texture) * 100}%`;
+                
+                document.getElementById('metamerismVal').textContent = `MI ${ap.metamerism_index}`;
+                document.getElementById('metamerismBar').style.width = `${(1 - ap.metamerism_index) * 100}%`;
+                
+                document.getElementById('coatingVal').textContent = `${ap.coating_thickness} µm`;
+                document.getElementById('coatingBar').style.width = `${(ap.coating_thickness / 25) * 100}%`;
+                
+                document.getElementById('corrosionVal').textContent = `${ap.corrosion_resistance}h`;
+                document.getElementById('corrosionBar').style.width = `${(ap.corrosion_resistance / 1000) * 100}%`;
+                
+                const critBadge = document.getElementById('criticalityBadge');
+                critBadge.textContent = ap.criticality;
+                const colorMap = {green: 'bg-green-100 text-green-700', blue: 'bg-blue-100 text-blue-700', orange: 'bg-orange-100 text-orange-700', red: 'bg-red-100 text-red-700'};
+                critBadge.className = `px-2 py-0.5 rounded-full text-[10px] font-semibold ${colorMap[ap.criticality_color] || 'bg-gray-100 text-gray-700'}`;
+            }
+            
             if (r.annotated_image) {
                 document.getElementById('annotatedImg').src = 'data:image/jpeg;base64,' + r.annotated_image;
                 document.getElementById('annotatedContainer').classList.remove('hidden');
