@@ -530,7 +530,7 @@ def detect_surface_defects(image):
                 "severity": DEFECT_TYPES[defect_type]["severity"],
                 "location": {"x": int(x), "y": int(y), "w": int(w), "h": int(h)},
                 "area": float(area),
-                "confidence": round(70 + np.random.random() * 25, 1)
+                "confidence": round(85 + (5000 - min(area, 5000)) / 5000 * 10, 1)
             })
     
     return defects[:5]  # En fazla 5 kusur
@@ -731,19 +731,14 @@ def draw_defects_on_image(image, defects, color_status, product_name):
 def analyze_color_region(image, color_code):
     """Görüntüdeki ana renk bölgesini analiz et"""
     if image is None:
-        # Simülasyon modu
+        # Görüntü yoksa referans değerleri döndür (ideal durum)
         ref = AYGUN_COLOR_STANDARDS[color_code]["lab_reference"]
-        # Gerçekçi sapma ekle
-        measured = {
-            "L": ref["L"] + np.random.uniform(-3, 3),
-            "a": ref["a"] + np.random.uniform(-2, 2),
-            "b": ref["b"] + np.random.uniform(-2, 2)
-        }
-        return measured
+        return {"L": ref["L"], "a": ref["a"], "b": ref["b"]}
     
-    # Görüntünün merkez bölgesini al
+    # Görüntünün merkez bölgesini al (daha geniş alan)
     h, w = image.shape[:2]
-    center_region = image[h//4:3*h//4, w//4:3*w//4]
+    margin_h, margin_w = h // 6, w // 6
+    center_region = image[margin_h:h-margin_h, margin_w:w-margin_w]
     
     # Ortalama renk hesapla
     avg_color = np.mean(center_region, axis=(0, 1))
@@ -1013,7 +1008,7 @@ async def analyze_uploaded_image(file: UploadFile = File(...), product_code: str
         "defects_detected": defects,
         "defect_count": len(defects),
         "overall_status": overall_status,
-        "confidence": round(85 + np.random.random() * 14, 1),
+        "confidence": round(95 - delta_e * 2 - len(defects) * 2, 1),
         "processing_time_ms": round(processing_time, 1),
         "annotated_image": to_base64(annotated_image),
         "color_heatmap": to_base64(color_heatmap),
@@ -1193,7 +1188,7 @@ async def analyze_product(product_code: str = "AYG-STR-001"):
         "defects_detected": defects,
         "defect_count": len(defects),
         "overall_status": overall_status,
-        "confidence": round(85 + np.random.random() * 14, 1),
+        "confidence": round(95 - delta_e * 2 - len(defects) * 2, 1),
         "processing_time_ms": round(processing_time, 1),
         "recommendation": recommendation,
         "advanced_parameters": advanced_params,

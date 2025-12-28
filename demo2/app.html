@@ -64,11 +64,11 @@
                         <div class="flex items-center gap-2">
                             <div id="colorPreview" class="w-8 h-8 rounded-lg border-2 border-white shadow-md" style="background-color: #0066B2;" title="Referans Renk"></div>
                             <select id="productSelect" onchange="updateColorPreview()" class="text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5">
-                                <option value="AYG-STR-001" data-color="#0066B2">Sterilizasyon Konteyneri (Mavi)</option>
-                                <option value="AYG-ORT-002" data-color="#00994C">Ortopedi Set Kapağı (Yeşil)</option>
-                                <option value="AYG-FRC-003" data-color="#8C8C8C">Forseps Gövdesi (Gri)</option>
-                                <option value="AYG-ACL-005" data-color="#CC3333">Acil Set Kapağı (Kırmızı)</option>
-                                <option value="AYG-NRO-006" data-color="#FFCC00">Nöroşirürji Set (Sarı)</option>
+                                <option value="AYG-STR-001" data-color="#0066B2">Sterilizasyon Konteyneri - RAL 5015</option>
+                                <option value="AYG-ORT-002" data-color="#00994C">Ortopedi Set Kapağı - RAL 6024</option>
+                                <option value="AYG-FRC-003" data-color="#8C8C8C">Forseps Gövdesi - RAL 7042</option>
+                                <option value="AYG-ACL-005" data-color="#CC3333">Acil Set Kapağı - RAL 3020</option>
+                                <option value="AYG-NRO-006" data-color="#FFCC00">Nöroşirürji Set - RAL 1023</option>
                             </select>
                         </div>
                     </div>
@@ -448,6 +448,8 @@
                 video.classList.remove('hidden');
                 placeholder.classList.add('hidden');
                 cameraOn = true;
+                hasUploadedImage = false;  // Kamera açılınca yüklenen görsel sıfırla
+                uploadedResult = null;
                 btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg> Kapat';
                 btn.classList.replace('bg-blue-600', 'bg-red-600');
             } else {
@@ -461,9 +463,27 @@
             }
         }
 
+        let hasUploadedImage = false;
+        let uploadedResult = null;
+        
         async function runAnalysis() {
-            const code = document.getElementById('productSelect').value;
             const btn = document.getElementById('btnAnalyze');
+            
+            // Yüklenen görsel varsa ve zaten analiz edilmişse, aynı sonucu göster
+            if (hasUploadedImage && uploadedResult) {
+                showResult(uploadedResult);
+                showHeatmaps(uploadedResult);
+                showReport(uploadedResult);
+                return;
+            }
+            
+            // Kamera veya görsel yoksa uyarı ver
+            if (!cameraOn && !hasUploadedImage) {
+                alert('Lütfen önce kamerayı açın veya bir görsel yükleyin!');
+                return;
+            }
+            
+            const code = document.getElementById('productSelect').value;
             btn.disabled = true;
             btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Analiz...';
             try {
@@ -534,6 +554,8 @@
                 });
                 const r = await res.json();
                 lastResult = r;
+                uploadedResult = r;  // Yüklenen görsel sonucunu sakla
+                hasUploadedImage = true;  // Görsel yüklendi işareti
                 showResult(r);
                 showHeatmaps(r);
                 showReport(r);
