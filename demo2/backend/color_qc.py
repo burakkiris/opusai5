@@ -249,6 +249,165 @@ def calculate_gloss(image):
     
     return round(gloss, 1)
 
+def analyze_surface_quality(image):
+    """Problem 2: Yüzey parlaklığı ve pürüzlülük analizi - Görsel kalite sınıflandırma"""
+    if image is None:
+        return {
+            "gloss_class": "ORTA",
+            "roughness_ra": 0.4,
+            "roughness_class": "PÜRÜZSÜZ",
+            "surface_score": 75,
+            "uniformity_score": 80,
+            "quality_grade": "A"
+        }
+    
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+    
+    # 1. Parlaklık Sınıflandırması (Gloss Classification)
+    gloss = calculate_gloss(image)
+    if gloss >= 80:
+        gloss_class = "YÜKSEK PARLAKLIK"
+    elif gloss >= 60:
+        gloss_class = "ORTA PARLAKLIK"
+    elif gloss >= 40:
+        gloss_class = "DÜŞÜK PARLAKLIK"
+    else:
+        gloss_class = "MAT"
+    
+    # 2. Yüzey Pürüzlülüğü (Ra - Ortalama Pürüzlülük)
+    # Laplacian varyansı ile yüzey dokusu analizi
+    laplacian = cv2.Laplacian(gray, cv2.CV_64F)
+    roughness_variance = np.var(laplacian)
+    
+    # Sobel gradyanları ile yüzey analizi
+    sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+    sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+    gradient_magnitude = np.sqrt(sobelx**2 + sobely**2)
+    
+    # Ra değeri tahmini (mikrometre)
+    roughness_ra = np.std(gradient_magnitude) / 100
+    roughness_ra = round(min(2.0, max(0.1, roughness_ra)), 2)
+    
+    # Pürüzlülük sınıflandırması
+    if roughness_ra <= 0.2:
+        roughness_class = "ÇOK PÜRÜZSÜZ"
+    elif roughness_ra <= 0.4:
+        roughness_class = "PÜRÜZSÜZ"
+    elif roughness_ra <= 0.8:
+        roughness_class = "NORMAL"
+    elif roughness_ra <= 1.2:
+        roughness_class = "HAFİF PÜRÜZLÜ"
+    else:
+        roughness_class = "PÜRÜZLÜ"
+    
+    # 3. Yüzey Homojenliği (Uniformity Score)
+    # Görüntüyü bloklara böl ve her bloğun standart sapmasını hesapla
+    h, w = gray.shape
+    block_size = 32
+    block_stds = []
+    
+    for i in range(0, h - block_size, block_size):
+        for j in range(0, w - block_size, block_size):
+            block = gray[i:i+block_size, j:j+block_size]
+            block_stds.append(np.std(block))
+    
+    if block_stds:
+        uniformity_score = 100 - min(100, np.std(block_stds) * 2)
+    else:
+        uniformity_score = 80
+    
+    uniformity_score = round(uniformity_score, 1)
+    
+    # 4. Yüzey Kalite Skoru (Surface Quality Score)
+    # Parlaklık, pürüzlülük ve homojenliğin ağırlıklı ortalaması
+    gloss_score = min(100, gloss * 1.2)
+    roughness_score = 100 - (roughness_ra / 2.0 * 100)
+    
+    surface_score = (gloss_score * 0.4 + roughness_score * 0.3 + uniformity_score * 0.3)
+    surface_score = round(min(100, max(0, surface_score)), 1)
+    
+    # 5. Kalite Sınıfı (Quality Grade)
+    if surface_score >= 90:
+        quality_grade = "A+"
+    elif surface_score >= 80:
+        quality_grade = "A"
+    elif surface_score >= 70:
+        quality_grade = "B"
+    elif surface_score >= 60:
+        quality_grade = "C"
+    else:
+        quality_grade = "D"
+    
+    return {
+        "gloss_value": gloss,
+        "gloss_class": gloss_class,
+        "roughness_ra": roughness_ra,
+        "roughness_class": roughness_class,
+        "uniformity_score": uniformity_score,
+        "surface_score": surface_score,
+        "quality_grade": quality_grade
+    }
+
+def analyze_color_consistency(image, color_code):
+    """Problem 2: Eloksal renk uyumsuzluğu analizi"""
+    if image is None or color_code not in AYGUN_COLOR_STANDARDS:
+        return {
+            "color_consistency": 85,
+            "color_zones": [],
+            "inconsistency_areas": 0,
+            "recommendation": "Analiz için görüntü gerekli"
+        }
+    
+    reference = AYGUN_COLOR_STANDARDS[color_code]
+    ref_lab = reference["lab_reference"]
+    
+    # Görüntüyü bölgelere ayır ve her bölgedeki renk farkını hesapla
+    h, w = image.shape[:2]
+    zone_size = 50
+    zones = []
+    inconsistent_count = 0
+    
+    for i in range(0, h - zone_size, zone_size):
+        for j in range(0, w - zone_size, zone_size):
+            region = image[i:i+zone_size, j:j+zone_size]
+            mean_color = np.mean(region, axis=(0, 1)).astype(int)
+            
+            # BGR to RGB
+            rgb = [int(mean_color[2]), int(mean_color[1]), int(mean_color[0])]
+            measured_lab = rgb_to_lab(rgb)
+            delta_e = calculate_delta_e_2000(measured_lab, ref_lab)
+            
+            zone_status = "OK" if delta_e <= 3.0 else "UYUMSUZ"
+            if zone_status == "UYUMSUZ":
+                inconsistent_count += 1
+            
+            zones.append({
+                "x": j, "y": i,
+                "delta_e": delta_e,
+                "status": zone_status
+            })
+    
+    total_zones = len(zones) if zones else 1
+    consistency = round((1 - inconsistent_count / total_zones) * 100, 1)
+    
+    # Öneri oluştur
+    if consistency >= 95:
+        recommendation = "Mükemmel renk tutarlılığı. Ürün standartlara uygun."
+    elif consistency >= 85:
+        recommendation = "İyi renk tutarlılığı. Küçük bölgesel sapmalar mevcut."
+    elif consistency >= 70:
+        recommendation = "Orta düzey tutarlılık. Eloksal banyosu kontrol edilmeli."
+    else:
+        recommendation = "Düşük tutarlılık! Eloksal prosesi gözden geçirilmeli."
+    
+    return {
+        "color_consistency": consistency,
+        "total_zones": total_zones,
+        "inconsistent_zones": inconsistent_count,
+        "zones": zones[:20],  # İlk 20 bölge
+        "recommendation": recommendation
+    }
+
 def calculate_advanced_parameters(image, defects, delta_e):
     """Gelişmiş kalite parametrelerini hesapla - ISO/ASTM standartları"""
     if image is None:
@@ -816,6 +975,10 @@ async def analyze_uploaded_image(file: UploadFile = File(...), product_code: str
     # Gelişmiş parametreleri hesapla
     advanced_params = calculate_advanced_parameters(original_frame, defects, delta_e)
     
+    # Problem 2: Yüzey kalitesi ve renk tutarlılığı analizi
+    surface_quality = analyze_surface_quality(original_frame)
+    color_consistency = analyze_color_consistency(original_frame, color_code)
+    
     # Görseller oluştur
     annotated_image = draw_defects_on_image(original_frame, defects, color_status, product["name"])
     color_heatmap = generate_color_heatmap(original_frame, color_code)
@@ -836,6 +999,8 @@ async def analyze_uploaded_image(file: UploadFile = File(...), product_code: str
         "source": "upload",
         "filename": file.filename,
         "advanced_parameters": advanced_params,
+        "surface_quality": surface_quality,
+        "color_consistency": color_consistency,
         "measured_lab": {k: round(v, 2) for k, v in measured_lab.items()},
         "reference_lab": reference_lab,
         "delta_e": delta_e,
@@ -974,6 +1139,10 @@ async def analyze_product(product_code: str = "AYG-STR-001"):
     # Gelişmiş parametreleri hesapla
     advanced_params = calculate_advanced_parameters(original_frame, defects, delta_e)
     
+    # Problem 2: Yüzey kalitesi ve renk tutarlılığı analizi
+    surface_quality = analyze_surface_quality(original_frame)
+    color_consistency = analyze_color_consistency(original_frame, color_code)
+    
     # Kusurları görüntü üzerine çiz
     annotated_image = None
     image_base64 = None
@@ -1028,6 +1197,8 @@ async def analyze_product(product_code: str = "AYG-STR-001"):
         "processing_time_ms": round(processing_time, 1),
         "recommendation": recommendation,
         "advanced_parameters": advanced_params,
+        "surface_quality": surface_quality,
+        "color_consistency": color_consistency,
         "annotated_image": image_base64,
         "color_heatmap": color_heatmap_base64,
         "gloss_map": gloss_map_base64,

@@ -242,6 +242,61 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Problem 2: Yüzey Kalitesi ve Renk Tutarlılığı -->
+                    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+                        <h3 class="text-sm font-semibold mb-3 flex items-center gap-2 text-blue-600">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                            Problem 2: Yüzey & Renk Analizi
+                        </h3>
+                        <div class="space-y-3 text-xs">
+                            <!-- Quality Grade -->
+                            <div class="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                <span class="text-gray-600 dark:text-gray-400 font-medium">Kalite Sınıfı</span>
+                                <span id="qualityGrade" class="text-2xl font-bold text-green-600">--</span>
+                            </div>
+                            
+                            <!-- Surface Score -->
+                            <div>
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-gray-600 dark:text-gray-400">Yüzey Kalite Skoru</span>
+                                    <span id="surfaceScoreVal" class="font-semibold">--</span>
+                                </div>
+                                <div class="h-2 bg-gray-100 dark:bg-gray-700 rounded-full">
+                                    <div id="surfaceScoreBar" class="h-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full transition-all" style="width:0%"></div>
+                                </div>
+                            </div>
+                            
+                            <!-- Gloss Classification -->
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600 dark:text-gray-400">Parlaklık Sınıfı</span>
+                                <span id="glossClass" class="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded text-[10px] font-medium">--</span>
+                            </div>
+                            
+                            <!-- Roughness -->
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600 dark:text-gray-400">Yüzey Pürüzlülüğü (Ra)</span>
+                                <span id="roughnessVal" class="font-mono font-semibold">-- µm</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600 dark:text-gray-400">Pürüzlülük Sınıfı</span>
+                                <span id="roughnessClass" class="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded text-[10px] font-medium">--</span>
+                            </div>
+                            
+                            <!-- Color Consistency -->
+                            <div class="pt-2 border-t border-gray-100 dark:border-gray-700">
+                                <div class="flex justify-between mb-1">
+                                    <span class="text-gray-600 dark:text-gray-400">Renk Tutarlılığı</span>
+                                    <span id="colorConsistencyVal" class="font-semibold">--%</span>
+                                </div>
+                                <div class="h-2 bg-gray-100 dark:bg-gray-700 rounded-full">
+                                    <div id="colorConsistencyBar" class="h-full bg-green-500 rounded-full transition-all" style="width:0%"></div>
+                                </div>
+                                <p id="colorConsistencyRec" class="text-gray-500 mt-1 text-[10px]">Analiz bekleniyor...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Annotated Image -->
                     <div id="annotatedContainer" class="hidden bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                         <img id="annotatedImg" class="w-full" alt="Analiz">
@@ -533,6 +588,29 @@
                 critBadge.textContent = ap.criticality;
                 const colorMap = {green: 'bg-green-100 text-green-700', blue: 'bg-blue-100 text-blue-700', orange: 'bg-orange-100 text-orange-700', red: 'bg-red-100 text-red-700'};
                 critBadge.className = `px-2 py-0.5 rounded-full text-[10px] font-semibold ${colorMap[ap.criticality_color] || 'bg-gray-100 text-gray-700'}`;
+            }
+            
+            // Problem 2: Yüzey Kalitesi ve Renk Tutarlılığı
+            if (r.surface_quality) {
+                const sq = r.surface_quality;
+                const gradeEl = document.getElementById('qualityGrade');
+                gradeEl.textContent = sq.quality_grade;
+                gradeEl.className = `text-2xl font-bold ${sq.quality_grade.includes('A') ? 'text-green-600' : sq.quality_grade === 'B' ? 'text-blue-600' : sq.quality_grade === 'C' ? 'text-orange-600' : 'text-red-600'}`;
+                
+                document.getElementById('surfaceScoreVal').textContent = `${sq.surface_score}/100`;
+                document.getElementById('surfaceScoreBar').style.width = `${sq.surface_score}%`;
+                
+                document.getElementById('glossClass').textContent = sq.gloss_class;
+                document.getElementById('roughnessVal').textContent = `${sq.roughness_ra} µm`;
+                document.getElementById('roughnessClass').textContent = sq.roughness_class;
+            }
+            
+            if (r.color_consistency) {
+                const cc = r.color_consistency;
+                document.getElementById('colorConsistencyVal').textContent = `${cc.color_consistency}%`;
+                document.getElementById('colorConsistencyBar').style.width = `${cc.color_consistency}%`;
+                document.getElementById('colorConsistencyBar').className = `h-full rounded-full transition-all ${cc.color_consistency >= 85 ? 'bg-green-500' : cc.color_consistency >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`;
+                document.getElementById('colorConsistencyRec').textContent = cc.recommendation;
             }
             
             if (r.annotated_image) {
