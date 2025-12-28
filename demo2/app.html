@@ -61,13 +61,16 @@
                 <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <div class="p-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
                         <span class="font-medium text-sm">Canlı Görüntü</span>
-                        <select id="productSelect" class="text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5">
-                            <option value="AYG-STR-001">Sterilizasyon Konteyneri</option>
-                            <option value="AYG-ORT-002">Ortopedi Set Kapağı</option>
-                            <option value="AYG-FRC-003">Forseps Gövdesi</option>
-                            <option value="AYG-ACL-005">Acil Set Kapağı</option>
-                            <option value="AYG-NRO-006">Nöroşirürji Set</option>
-                        </select>
+                        <div class="flex items-center gap-2">
+                            <div id="colorPreview" class="w-8 h-8 rounded-lg border-2 border-white shadow-md" style="background-color: #0066B2;" title="Referans Renk"></div>
+                            <select id="productSelect" onchange="updateColorPreview()" class="text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5">
+                                <option value="AYG-STR-001" data-color="#0066B2">Sterilizasyon Konteyneri (Mavi)</option>
+                                <option value="AYG-ORT-002" data-color="#00994C">Ortopedi Set Kapağı (Yeşil)</option>
+                                <option value="AYG-FRC-003" data-color="#8C8C8C">Forseps Gövdesi (Gri)</option>
+                                <option value="AYG-ACL-005" data-color="#CC3333">Acil Set Kapağı (Kırmızı)</option>
+                                <option value="AYG-NRO-006" data-color="#FFCC00">Nöroşirürji Set (Sarı)</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="relative aspect-video bg-gray-900">
                         <img id="videoFeed" class="w-full h-full object-contain hidden">
@@ -407,6 +410,15 @@
                 document.getElementById('tab-' + t).classList.toggle('tab-active', t === name);
                 document.getElementById('tab-' + t).classList.toggle('text-gray-500', t !== name);
             });
+        }
+
+        function updateColorPreview() {
+            const select = document.getElementById('productSelect');
+            const preview = document.getElementById('colorPreview');
+            const selectedOption = select.options[select.selectedIndex];
+            const color = selectedOption.getAttribute('data-color');
+            preview.style.backgroundColor = color;
+            preview.title = selectedOption.text;
         }
 
         function initCharts() {
