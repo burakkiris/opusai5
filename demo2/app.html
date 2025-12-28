@@ -73,7 +73,16 @@
                         <img id="videoFeed" class="w-full h-full object-contain hidden">
                         <div id="videoPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
                             <svg class="w-16 h-16 mb-2 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                            <p class="text-sm">Kamerayı başlatın</p>
+                            <p class="text-sm mb-4">Kamerayı başlatın veya görsel yükleyin</p>
+                            <!-- Görsel Yükleme Alanı -->
+                            <label id="dropZone" class="cursor-pointer border-2 border-dashed border-purple-400 rounded-xl p-6 hover:bg-purple-900/20 transition-all">
+                                <div class="flex flex-col items-center">
+                                    <svg class="w-10 h-10 text-purple-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    <span class="text-purple-400 font-medium">Görsel Yükle</span>
+                                    <span class="text-xs text-gray-500 mt-1">veya sürükleyip bırakın</span>
+                                </div>
+                                <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="uploadImage(event)">
+                            </label>
                         </div>
                     </div>
                     <div class="p-3 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">

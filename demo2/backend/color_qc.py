@@ -39,6 +39,8 @@ camera = None
 camera_lock = threading.Lock()
 measurement_history: List[dict] = []
 is_analyzing = False
+uploaded_frame = None  # Yüklenen görsel için
+uploaded_color_code = "MAVI"  # Yüklenen görselin renk kodu
 
 # Aygün Cerrahi Aletler - Eloksal Renk Standartları
 AYGUN_COLOR_STANDARDS = {
@@ -452,28 +454,13 @@ def create_simulated_image(product_code, color_code):
     return img
 
 def draw_defects_on_image(image, defects, color_status, product_name):
-    """Kusurları görüntü üzerine çiz - Aygün Cerrahi Aletler formatı"""
+    """Kusurları görüntü üzerine çiz - sadece kusur kutuları"""
     if image is None:
         return None
     
     annotated = image.copy()
-    h, w = annotated.shape[:2]
     
-    # Aygün logosu için üst banner
-    cv2.rectangle(annotated, (0, 0), (w, 60), (30, 58, 95), -1)
-    cv2.putText(annotated, "AYGUN CERRAHI ALETLER", (10, 25), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-    cv2.putText(annotated, product_name, (10, 50), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
-    
-    # Renk durumu badge
-    status_color = (0, 255, 0) if color_status == "GECTI" else (0, 165, 255) if color_status == "UYARI" else (0, 0, 255)
-    status_text = "RENK: " + color_status
-    cv2.rectangle(annotated, (w-200, 10), (w-10, 50), status_color, -1)
-    cv2.putText(annotated, status_text, (w-190, 35), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-    
-    # Kusurları işaretle
+    # Sadece kusurları işaretle
     for i, defect in enumerate(defects):
         loc = defect["location"]
         x, y, dw, dh = loc["x"], loc["y"], loc["w"], loc["h"]
@@ -490,27 +477,14 @@ def draw_defects_on_image(image, defects, color_status, product_name):
         cv2.rectangle(annotated, (x, y), (x + dw, y + dh), color, 3)
         
         # Kusur etiketi
-        label = f"{i+1}. {defect['name']}"
-        label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+        label = f"{defect['name']}"
+        label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
         
         # Etiket arka planı
-        cv2.rectangle(annotated, (x, y - label_size[1] - 10), 
-                     (x + label_size[0] + 10, y), color, -1)
-        cv2.putText(annotated, label, (x + 5, y - 5), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        
-        # Güven skoru
-        conf_text = f"%{defect['confidence']:.0f}"
-        cv2.putText(annotated, conf_text, (x + dw - 50, y + dh - 5), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-    
-    # Alt bilgi çubuğu
-    cv2.rectangle(annotated, (0, h-40), (w, h), (30, 58, 95), -1)
-    timestamp = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-    cv2.putText(annotated, f"Analiz Zamani: {timestamp}", (10, h-15), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-    cv2.putText(annotated, f"Kusur Sayisi: {len(defects)}", (w-200, h-15), 
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        cv2.rectangle(annotated, (x, y - label_size[1] - 8), 
+                     (x + label_size[0] + 8, y), color, -1)
+        cv2.putText(annotated, label, (x + 4, y - 4), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
     
     return annotated
 
@@ -641,35 +615,36 @@ async def video_feed():
 async def heatmap_feed(color_code: str = "MAVI"):
     """Canlı ısı haritası stream - Delta E görselleştirme"""
     def generate_heatmap_stream():
+        global uploaded_frame, uploaded_color_code
         last_sim_time = 0
         sim_frame = None
         
         while True:
-            frame = get_frame()
-            
-            # Kamera yoksa simülasyon
-            if frame is None:
-                current_time = time.time()
-                if sim_frame is None or (current_time - last_sim_time) > 2:
-                    product_code = np.random.choice(list(AYGUN_PRODUCTS.keys()))
-                    c_code = AYGUN_PRODUCTS[product_code]["expected_color"]
-                    sim_frame = create_simulated_image(product_code, c_code)
-                    last_sim_time = current_time
-                frame = sim_frame
+            # Önce yüklenmiş görsel var mı kontrol et
+            if uploaded_frame is not None:
+                frame = uploaded_frame
+                color_code = uploaded_color_code
+            else:
+                frame = get_frame()
+                
+                # Kamera yoksa simülasyon
+                if frame is None:
+                    current_time = time.time()
+                    if sim_frame is None or (current_time - last_sim_time) > 2:
+                        product_code = np.random.choice(list(AYGUN_PRODUCTS.keys()))
+                        c_code = AYGUN_PRODUCTS[product_code]["expected_color"]
+                        sim_frame = create_simulated_image(product_code, c_code)
+                        last_sim_time = current_time
+                    frame = sim_frame
             
             if frame is None:
                 time.sleep(0.1)
                 continue
             
-            # Isı haritası oluştur
+            # Isı haritası oluştur (şablon olmadan)
             heatmap = generate_color_heatmap(frame, color_code)
             
             if heatmap is not None:
-                # Başlık ekle
-                cv2.rectangle(heatmap, (0, 0), (heatmap.shape[1], 40), (30, 58, 95), -1)
-                cv2.putText(heatmap, f"CANLI RENK SAPMA HARITASI - {AYGUN_COLOR_STANDARDS[color_code]['name']}", 
-                           (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                
                 ret, buffer = cv2.imencode('.jpg', heatmap, [cv2.IMWRITE_JPEG_QUALITY, 80])
                 frame_bytes = buffer.tobytes()
                 
@@ -686,12 +661,16 @@ async def heatmap_feed(color_code: str = "MAVI"):
 @app.post("/analyze/upload")
 async def analyze_uploaded_image(file: UploadFile = File(...), product_code: str = "AYG-STR-001"):
     """Yüklenen görsel üzerinden analiz yap"""
+    global uploaded_frame, uploaded_color_code
     start_time = time.time()
     
     # Görsel oku
     contents = await file.read()
     nparr = np.frombuffer(contents, np.uint8)
     frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    
+    # Yüklenen görseli sakla
+    uploaded_frame = frame.copy() if frame is not None else None
     
     if frame is None:
         raise HTTPException(status_code=400, detail="Görsel okunamadı")
@@ -706,6 +685,7 @@ async def analyze_uploaded_image(file: UploadFile = File(...), product_code: str
     
     product = AYGUN_PRODUCTS[product_code]
     color_code = product["expected_color"]
+    uploaded_color_code = color_code  # Renk kodunu sakla
     color_standard = AYGUN_COLOR_STANDARDS[color_code]
     
     original_frame = frame.copy()
